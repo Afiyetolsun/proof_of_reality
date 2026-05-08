@@ -7,7 +7,7 @@
     "dev": "tsx watch src/server.ts",
     "dev:vercel": "vercel dev",
     "start": "tsx src/server.ts",
-    "build": "tsc",
+    "build": "pnpm --filter \"@proof-of-reality/api^...\" run build && tsc",
     "deploy": "vercel --prod",
     "typecheck": "tsc --noEmit",
     "lint": "echo 'todo: eslint'"
