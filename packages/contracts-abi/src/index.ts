@@ -1193,3 +1193,309 @@ export const DeviceRegistryAbi = [
   }
 ] as const;
 export type DeviceRegistryAbiType = typeof DeviceRegistryAbi;
+
+export const RealityENSResolverAbi = [
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_admin",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "constructor"
+  },
+  {
+    "inputs": [],
+    "name": "NotAdmin",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "UnknownNode",
+    "type": "error"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "node",
+        "type": "bytes32"
+      },
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "tokenId",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "bytes32",
+        "name": "bundleHash",
+        "type": "bytes32"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "attestor",
+        "type": "address"
+      }
+    ],
+    "name": "ProofPublished",
+    "type": "event"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "node",
+        "type": "bytes32"
+      }
+    ],
+    "name": "addr",
+    "outputs": [
+      {
+        "internalType": "address payable",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "admin",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "node",
+        "type": "bytes32"
+      }
+    ],
+    "name": "contenthash",
+    "outputs": [
+      {
+        "internalType": "bytes",
+        "name": "",
+        "type": "bytes"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "name": "exists",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "name": "proofs",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "attestor",
+        "type": "address"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "bundleHash",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "bytes",
+        "name": "contenthash",
+        "type": "bytes"
+      },
+      {
+        "internalType": "string",
+        "name": "satSig",
+        "type": "string"
+      },
+      {
+        "internalType": "string",
+        "name": "cosmoSig",
+        "type": "string"
+      },
+      {
+        "internalType": "string",
+        "name": "sceneCid",
+        "type": "string"
+      },
+      {
+        "internalType": "uint64",
+        "name": "capturedAt",
+        "type": "uint64"
+      },
+      {
+        "internalType": "uint256",
+        "name": "tokenId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint8",
+        "name": "mode",
+        "type": "uint8"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "newAdmin",
+        "type": "address"
+      }
+    ],
+    "name": "setAdmin",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "node",
+        "type": "bytes32"
+      },
+      {
+        "components": [
+          {
+            "internalType": "address",
+            "name": "attestor",
+            "type": "address"
+          },
+          {
+            "internalType": "bytes32",
+            "name": "bundleHash",
+            "type": "bytes32"
+          },
+          {
+            "internalType": "bytes",
+            "name": "contenthash",
+            "type": "bytes"
+          },
+          {
+            "internalType": "string",
+            "name": "satSig",
+            "type": "string"
+          },
+          {
+            "internalType": "string",
+            "name": "cosmoSig",
+            "type": "string"
+          },
+          {
+            "internalType": "string",
+            "name": "sceneCid",
+            "type": "string"
+          },
+          {
+            "internalType": "uint64",
+            "name": "capturedAt",
+            "type": "uint64"
+          },
+          {
+            "internalType": "uint256",
+            "name": "tokenId",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint8",
+            "name": "mode",
+            "type": "uint8"
+          }
+        ],
+        "internalType": "struct RealityENSResolver.Proof",
+        "name": "p",
+        "type": "tuple"
+      }
+    ],
+    "name": "setProof",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes4",
+        "name": "interfaceId",
+        "type": "bytes4"
+      }
+    ],
+    "name": "supportsInterface",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "pure",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "node",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "string",
+        "name": "key",
+        "type": "string"
+      }
+    ],
+    "name": "text",
+    "outputs": [
+      {
+        "internalType": "string",
+        "name": "",
+        "type": "string"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  }
+] as const;
+export type RealityENSResolverAbiType = typeof RealityENSResolverAbi;

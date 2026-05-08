@@ -2,6 +2,7 @@ import { Router, type Router as RouterT } from "express";
 import { z } from "zod";
 import { privateKeyToAccount } from "viem/accounts";
 import { mintRealityProof } from "../services/chain.service.js";
+import { publishToEns } from "../services/ens.service.js";
 import { ApiError } from "../middleware/error.middleware.js";
 import { env } from "../config/env.js";
 import type { Address, Hex } from "viem";
@@ -66,11 +67,37 @@ mintRouter.post("/", async (req, res, next) => {
       mode: a.mode as 0 | 1 | 2,
     });
 
+    // Predict the ENS subname deterministically (vin-<bundleHash[2:14]>.realityproof.eth)
+    // so iOS can render it on the success card immediately. The actual ENS
+    // publication (NameWrapper.setSubnodeRecord + RealityENSResolver.setProof)
+    // fires async — name is resolvable ~10s after this response.
+    const predictedEnsName = (() => {
+      if (!env().ENS_PARENT_NAME) return null;
+      const slug = a.bundleHash.replace(/^0x/, "").slice(0, 12).toLowerCase();
+      return `vin-${slug}.${env().ENS_PARENT_NAME}`;
+    })();
+
+    publishToEns({
+      bundleHash: a.bundleHash as Hex,
+      attestor: recipient,
+      satSig: a.satSig,
+      cosmoSig: a.cosmoSig,
+      sceneCid: a.swarmRef,
+      bundleRefCid: a.bundleRef.startsWith("local:") ? "" : a.bundleRef,
+      capturedAt: a.capturedAt,
+      tokenId: result.tokenId,
+      mode: a.mode as 0 | 1 | 2,
+    })
+      .then((r) => {
+        if (r) console.log(`[mint] ENS published: ${r.subname}`);
+      })
+      .catch((e) => console.warn("[mint] ENS publish error:", (e as Error).message));
+
     res.json({
       // iOS-canonical fields
       txHash: result.txHash,
       tokenId: result.tokenId,
-      ensName: result.ensName,
+      ensName: predictedEnsName ?? result.ensName,
       stub: false,
       // additive
       explorerUrl: `https://sepolia.basescan.org/tx/${result.txHash}`,

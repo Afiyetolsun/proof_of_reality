@@ -5,7 +5,13 @@ import "dotenv/config";
 
 import type { HardhatUserConfig } from "hardhat/config";
 
-const { BASE_SEPOLIA_RPC, DEPLOYER_PK, BASESCAN_API_KEY } = process.env;
+const {
+  BASE_SEPOLIA_RPC,
+  ETH_SEPOLIA_RPC,
+  DEPLOYER_PK,
+  BASESCAN_API_KEY,
+  ETHERSCAN_API_KEY,
+} = process.env;
 
 const config: HardhatUserConfig = {
   solidity: {
@@ -23,10 +29,17 @@ const config: HardhatUserConfig = {
       accounts: DEPLOYER_PK ? [DEPLOYER_PK] : [],
       chainId: 84532,
     },
+    // Ethereum Sepolia — used only for the ENS resolver (ENS lives on L1).
+    sepolia: {
+      url: ETH_SEPOLIA_RPC ?? "https://ethereum-sepolia-rpc.publicnode.com",
+      accounts: DEPLOYER_PK ? [DEPLOYER_PK] : [],
+      chainId: 11155111,
+    },
   },
   etherscan: {
     apiKey: {
       baseSepolia: BASESCAN_API_KEY ?? "",
+      sepolia: ETHERSCAN_API_KEY ?? "",
     },
     customChains: [
       {

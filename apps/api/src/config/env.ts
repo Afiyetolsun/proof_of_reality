@@ -18,6 +18,12 @@ const EnvSchema = z.object({
   REALITY_PROOF_ADDRESS: z.string().regex(/^0x[0-9a-fA-F]{40}$/),
   DEVICE_REGISTRY_ADDRESS: z.string().regex(/^0x[0-9a-fA-F]{40}$/),
 
+  // ENS — lives on Ethereum Sepolia (separate chain from Base Sepolia where the NFT lives).
+  // All optional: if any is missing, /api/mint still mints, just skips ENS publication.
+  ETH_SEPOLIA_RPC: z.string().url().optional(),
+  ENS_PARENT_NAME: z.string().optional(),
+  ENS_RESOLVER_ADDRESS: z.string().regex(/^0x[0-9a-fA-F]{40}$/).optional(),
+
   ENS_PARENT_DOMAIN: z.string().optional(),
 
   LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),

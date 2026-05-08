@@ -11,7 +11,7 @@ const ROOT = resolve(import.meta.dirname, "../../..");
 const ARTIFACTS = join(ROOT, "contracts", "artifacts", "contracts");
 const OUT = join(import.meta.dirname, "..", "src", "index.ts");
 
-const CONTRACTS = ["RealityProof", "DeviceRegistry"] as const;
+const CONTRACTS = ["RealityProof", "DeviceRegistry", "RealityENSResolver"] as const;
 
 function readAbi(name: string): unknown[] {
   const path = join(ARTIFACTS, `${name}.sol`, `${name}.json`);

@@ -7,7 +7,9 @@
     "test": "hardhat test",
     "node": "hardhat node",
     "deploy:sepolia": "hardhat ignition deploy ignition/modules/ProofOfReality.ts --network baseSepolia",
+    "deploy:ens-sepolia": "hardhat ignition deploy ignition/modules/RealityENSResolver.ts --network sepolia",
     "verify": "hardhat verify --network baseSepolia",
+    "verify:ens": "hardhat verify --network sepolia",
     "abi:export": "pnpm --filter @proof-of-reality/contracts-abi sync"
   },
   "dependencies": {
