@@ -35,10 +35,6 @@ if (!verified) throw new Error("Swarm gateway returned tampered content");
 - API mirrors `helia-verified-fetch` for cross-protocol familiarity
 - Resilient: optional `permissive` flag returns `verified: false` instead of throwing on partial verification
 
-## Submitted to
-
-Swarm Verified Fetch bounty, ETHPrague 2026.
-
 ## License
 
 MIT

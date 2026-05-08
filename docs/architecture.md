@@ -86,11 +86,3 @@ Two contracts on Base Sepolia (chain ID 84532):
 - **`DeviceRegistry`** — public registry of B2B device addresses to their org wallets. Permissionless registration.
 
 Verification logic stays off-chain. The contracts are dumb commit logs.
-
-## Bounty alignment
-
-| Bounty | How we hit it |
-|---|---|
-| **SpaceComputer** ($6k) | Cross-track: hardware (USB Armory) + APIs (cTRNG + KMS). Used in both clients. |
-| **Swarm Verified Fetch** ($250) | `packages/verified-swarm-fetch` is a standalone, published library submission. |
-| **ENS** | `vin-xxx.realityproof.eth` resolver hooked at mint. |

@@ -30,7 +30,7 @@ export async function verifyAppAttest(
   }
   const { keyId, assertion } = bundle.attestation.appAttest;
   if (!keyId || !assertion) return { ok: false, reason: "empty appAttest fields" };
-  // TODO(hackathon): wire real verification before claiming the bounty.
+  // TODO(hackathon): wire real Apple cert chain verification before shipping.
   void challenge;
   return { ok: true, keyId };
 }

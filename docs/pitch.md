@@ -18,7 +18,6 @@
 - Three trust roots: SpaceComputer satellite cTRNG, Space Fabric KMS cosig, hardware-resident device key
 - Five-check verification in the viewer
 - Permissionless on-chain device registry — orgs publicly stake reputation
-- Bounty stack: SpaceComputer ($6k) + Swarm Verified Fetch ($250) + ENS
 
 ## What to actually demo on stage
 

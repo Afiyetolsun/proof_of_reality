@@ -48,6 +48,6 @@ The iOS app needs:
 - `IOS_SHARED_SECRET` → Bearer token for the backend (NOT a crypto key — see backend README)
 - Bundle ID for App Attest
 
-## Bounty fit
+## Trust root parity
 
-The iOS path uses Apple App Attest **plus** SpaceComputer KMS co-signature (added by the backend). That gives the B2C path the same Space Fabric trust root as the B2B path — both qualify for the SpaceComputer bounty under "Use Space-Powered Security APIs".
+The iOS path uses Apple App Attest **plus** SpaceComputer KMS co-signature (added by the backend). That gives the B2C path the same Space Fabric trust root as the B2B path — same `ProofBundle` shape, same backend endpoints, same on-chain commitment.

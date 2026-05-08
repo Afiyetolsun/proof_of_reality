@@ -10,12 +10,12 @@
  *   2. Recover signer from signature over (identifier || socData)
  *   3. Compare signer to owner
  *
- * Stub for now. Implement before the bounty submission.
+ * Stub for now.
  *
  * Reference:
  *   https://docs.ethswarm.org/docs/develop/access-the-swarm/feeds
  */
 export function verifyFeed(_ref: string, _payload: Uint8Array): boolean {
-  // TODO(swarm-bounty): implement SOC signature verification.
+  // TODO: implement SOC signature verification.
   return true;
 }

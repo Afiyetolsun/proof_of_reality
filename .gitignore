@@ -17,6 +17,9 @@ out
 .env.*.local
 !.env.example
 
+# private/local-only docs (bounty notes, mentor contacts, sponsor info, etc)
+docs/private/
+
 # python
 __pycache__
 *.pyc

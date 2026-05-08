@@ -1,6 +1,6 @@
 # Proof of Reality
 
-Web3 oracle for the physical world. **ETHPrague 2026 — SpaceComputer track.**
+Web3 oracle for the physical world.
 
 Two capture frontends, one trust pipeline:
 
@@ -28,7 +28,7 @@ proof_of_reality/
 │   ├── proof-bundle/         # Canonical schema + zod + keccak. THE source of truth.
 │   ├── attestation/          # App Attest + device-key + KMS verifiers
 │   ├── contracts-abi/        # ABIs synced from contracts/artifacts
-│   ├── verified-swarm-fetch/ # Trustless Swarm gateway client (Swarm bounty)
+│   ├── verified-swarm-fetch/ # Trustless Swarm gateway client
 │   └── tsconfig/             # Shared TS configs
 ├── docs/               # Architecture, trust model, flows, pitch
 └── tools/              # CLIs, demo scripts
@@ -50,12 +50,6 @@ Camera agent has its own toolchain (uv + Python 3.11):
 ```bash
 cd apps/camera-agent && uv sync && uv run proof-agent
 ```
-
-## Bounty stack
-
-- **SpaceComputer** ($6k pool) — primary. Cross-track: Hardware (USB Armory Mk II) + APIs (cTRNG + KMS).
-- **Swarm Verified Fetch** ($250) — `packages/verified-swarm-fetch` is a standalone library submission.
-- **ENS** — `vin-xxx.realityproof.eth` per token (optional, contracts already shaped for it).
 
 ## Status
 
