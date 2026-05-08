@@ -159,3 +159,9 @@ console.log(`  scene:    https://gateway.pinata.cloud/ipfs/${upload.swarmRef}`);
 if (upload.bundleRef) {
   console.log(`  bundle:   https://gateway.pinata.cloud/ipfs/${upload.bundleRef}`);
 }
+if (mint.ensName) {
+  console.log(`  ens:      ${mint.ensName}`);
+  console.log(`  resolve:  https://sepolia.app.ens.domains/${mint.ensName}`);
+} else {
+  console.log("  ens:      (not yet — server is missing ENS_PARENT_NAME or ENS_RESOLVER_ADDRESS)");
+}
