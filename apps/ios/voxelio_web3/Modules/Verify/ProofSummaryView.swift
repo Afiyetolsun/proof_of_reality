@@ -23,7 +23,6 @@ struct ProofSummaryView: View {
     let onDone: () -> Void
 
     @StateObject private var submitter = ProofSubmitter()
-    @State private var showShare = false
     @State private var preview: PreviewMode?
 
     private enum PreviewMode: Identifiable {
@@ -106,9 +105,6 @@ struct ProofSummaryView: View {
         .background(Color(.systemBackground))
         .navigationTitle("Proof bundle")
         .navigationBarTitleDisplayMode(.inline)
-        .sheet(isPresented: $showShare) {
-            ShareSheet(items: [payload.bundleURL])
-        }
         .fullScreenCover(item: $preview) { mode in
             ZStack(alignment: .topTrailing) {
                 switch mode {
@@ -127,10 +123,39 @@ struct ProofSummaryView: View {
         }
     }
 
+    private var sessionFolder: URL {
+        payload.bundleURL.deletingLastPathComponent()
+    }
+
     private var sceneURL: URL {
-        payload.bundleURL
-            .deletingLastPathComponent()
-            .appendingPathComponent(payload.bundle.scene.name)
+        sessionFolder.appendingPathComponent(payload.bundle.scene.name)
+    }
+
+    /// JSON sidecars: bundle.json plus sensors.json and mint.json when
+    /// they exist. Lets the user share the cryptographic envelope without
+    /// also moving the heavy USDZ.
+    private var dataFiles: [URL] {
+        var files = [payload.bundleURL]
+        for name in ["sensors.json", "mint.json"] {
+            let url = sessionFolder.appendingPathComponent(name)
+            if FileManager.default.fileExists(atPath: url.path) {
+                files.append(url)
+            }
+        }
+        return files
+    }
+
+    /// Everything the session produced — JSONs, USDZ scene, optional audio.
+    private var allFiles: [URL] {
+        var all = dataFiles
+        all.append(sceneURL)
+        if let audio = payload.bundle.audio {
+            let url = sessionFolder.appendingPathComponent(audio.name)
+            if FileManager.default.fileExists(atPath: url.path) {
+                all.append(url)
+            }
+        }
+        return all
     }
 
     private var header: some View {
@@ -254,12 +279,21 @@ struct ProofSummaryView: View {
                 EmptyView()
             }
 
-            Button {
-                showShare = true
+            Menu {
+                ShareLink(item: sceneURL) {
+                    Label("3D scene (.usdz)", systemImage: "cube.transparent")
+                }
+                ShareLink(items: dataFiles) {
+                    Label("Proof data (JSON)", systemImage: "doc.text")
+                }
+                ShareLink(items: allFiles) {
+                    Label("Everything", systemImage: "square.and.arrow.up.on.square")
+                }
             } label: {
-                Label("Share bundle.json", systemImage: "square.and.arrow.up")
+                Label("Share…", systemImage: "square.and.arrow.up")
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 10)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.bordered)
 
@@ -283,10 +317,3 @@ struct ProofSummaryView: View {
     }
 }
 
-private struct ShareSheet: UIViewControllerRepresentable {
-    let items: [Any]
-    func makeUIViewController(context: Context) -> UIActivityViewController {
-        UIActivityViewController(activityItems: items, applicationActivities: nil)
-    }
-    func updateUIViewController(_ controller: UIActivityViewController, context: Context) {}
-}
