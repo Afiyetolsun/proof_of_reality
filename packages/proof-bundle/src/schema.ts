@@ -27,10 +27,12 @@ export const SatelliteSignatureSchema = z.object({
   pk: HexString,
 });
 
+// Server-side `src` widens beyond the original three: when the satellite is
+// out of coverage, Orbitport returns `src: "derived"` with no per-call sig.
 export const NonceSchema = z.object({
   value: HexString,
-  src: z.enum(NONCE_SOURCES),
-  satSig: SatelliteSignatureSchema,
+  src: z.string(),
+  satSig: SatelliteSignatureSchema.nullable().optional(),
   issuedAt: z.number().int().positive(),
   binding: z.array(z.enum(NONCE_BINDINGS)).nonempty(),
 });

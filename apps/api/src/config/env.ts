@@ -27,9 +27,22 @@ export type Env = z.infer<typeof EnvSchema>;
 
 let cached: Env | null = null;
 
+/**
+ * Treat empty strings as missing so `optional()` actually works when a var is
+ * present in .env but left blank (e.g. SWARM_POSTAGE_BATCH_ID before you've
+ * picked one up).
+ */
+function sanitize(env: NodeJS.ProcessEnv): Record<string, string | undefined> {
+  const out: Record<string, string | undefined> = {};
+  for (const [k, v] of Object.entries(env)) {
+    out[k] = v === "" ? undefined : v;
+  }
+  return out;
+}
+
 export function env(): Env {
   if (cached) return cached;
-  const parsed = EnvSchema.safeParse(process.env);
+  const parsed = EnvSchema.safeParse(sanitize(process.env));
   if (!parsed.success) {
     console.error("[env] invalid:", parsed.error.flatten().fieldErrors);
     throw new Error("Environment variable validation failed");

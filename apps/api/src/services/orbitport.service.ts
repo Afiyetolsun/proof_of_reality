@@ -11,34 +11,38 @@ function sdk(): OrbitportSDK {
       clientSecret: env().ORBITPORT_CLIENT_SECRET,
     },
   });
+  if (env().LOG_LEVEL === "debug" || process.env.ORBITPORT_DEBUG) {
+    _sdk.setDebug(true);
+  }
   return _sdk;
 }
 
 export interface CosmicNonce {
   value: `0x${string}`;
-  src: "trng" | "rng" | "ipfs";
-  satSig: { value: `0x${string}`; pk: `0x${string}` };
+  /** Reflects what cTRNG returned: "trng" / "rng" / "ipfs" / "derived" / etc. */
+  src: string;
+  /** Null when the satellite isn't currently in coverage and cTRNG returned a derived value. */
+  satSig: { value: `0x${string}`; pk: `0x${string}` } | null;
   issuedAt: number;
   provider?: string;
 }
 
-/** Fetch a fresh cosmic random + satellite signature. Used by /api/nonce. */
+/** Fetch a fresh cosmic random + (when available) satellite signature. */
 export async function getCosmicNonce(): Promise<CosmicNonce> {
   const r = await sdk().ctrng.random();
   const d = r.data;
-  if (!d.signature) {
-    // IPFS-beacon source has no per-call signature (signed at beacon publish time).
-    // For B2C/B2B capture flow we want the API source.
-    throw new Error(`cTRNG returned no signature (src=${d.src})`);
-  }
   return {
     value: ("0x" + d.data.replace(/^0x/, "")) as `0x${string}`,
-    src: d.src as "trng" | "rng" | "ipfs",
-    satSig: {
-      value: ("0x" + d.signature.value.replace(/^0x/, "")) as `0x${string}`,
-      pk: ("0x" + d.signature.pk.replace(/^0x/, "")) as `0x${string}`,
-    },
-    issuedAt: d.timestamp ? Math.floor(new Date(d.timestamp).getTime() / 1000) : Math.floor(Date.now() / 1000),
+    src: d.src,
+    satSig: d.signature
+      ? {
+          value: ("0x" + d.signature.value.replace(/^0x/, "")) as `0x${string}`,
+          pk: ("0x" + d.signature.pk.replace(/^0x/, "")) as `0x${string}`,
+        }
+      : null,
+    issuedAt: d.timestamp
+      ? Math.floor(new Date(d.timestamp).getTime() / 1000)
+      : Math.floor(Date.now() / 1000),
     provider: d.provider,
   };
 }
