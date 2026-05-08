@@ -6,23 +6,16 @@ struct RootView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 24) {
+            VStack(alignment: .leading, spacing: 28) {
                 header
 
-                VStack(spacing: 16) {
-                    ForEach(ScanMode.allCases) { mode in
-                        Button { selectedMode = mode } label: {
-                            ModeCard(mode: mode)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
+                modeList
 
-                Spacer()
-
-                footer
+                Spacer(minLength: 0)
             }
-            .padding(24)
+            .padding(.horizontal, 24)
+            .padding(.top, 16)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
@@ -47,21 +40,27 @@ struct RootView: View {
         }
     }
 
+    /// Tight title block — subtitle hugs the title instead of floating in the
+    /// middle of the screen between the header and the mode cards.
     private var header: some View {
-        VStack(spacing: 8) {
+        VStack(alignment: .leading, spacing: 4) {
             Text("Proof of Reality")
                 .font(.largeTitle.bold())
             Text("Pick a capture mode")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private var footer: some View {
-        Text("ETHPrague 2026 · SpaceComputer track")
-            .font(.caption)
-            .foregroundStyle(.tertiary)
+    private var modeList: some View {
+        VStack(spacing: 14) {
+            ForEach(ScanMode.allCases) { mode in
+                Button { selectedMode = mode } label: {
+                    ModeCard(mode: mode)
+                }
+                .buttonStyle(.plain)
+            }
+        }
     }
 }
 
