@@ -12,10 +12,10 @@
     "lint": "echo 'todo: eslint'"
   },
   "dependencies": {
-    "@proof-of-reality/proof-bundle": "workspace:*",
     "@proof-of-reality/attestation": "workspace:*",
     "@proof-of-reality/contracts-abi": "workspace:*",
-    "@spacecomputer-io/orbitport-sdk-ts": "^0.1.0",
+    "@proof-of-reality/proof-bundle": "workspace:*",
+    "@spacecomputer-io/orbitport-sdk-ts": "^0.2.1",
     "@vercel/node": "^3.2.24",
     "express": "^4.21.1",
     "multer": "^1.4.5-lts.1",

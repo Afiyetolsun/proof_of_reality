@@ -58,8 +58,8 @@ cp .env.example .env
 | `IOS_SHARED_SECRET` | **Generate now**: `openssl rand -hex 32`. | Both iOS app and camera-agent send this as `Authorization: Bearer …` to authenticate to the backend. NOT a crypto key — just a coarse "stop random internet" filter. |
 | `ORBITPORT_CLIENT_ID` | ✅ Already have it. | From the SpaceComputer booth. |
 | `ORBITPORT_CLIENT_SECRET` | ✅ Already have it. | Same. |
-| `KMS_COSIGNER_KEY_ID` | **Leave empty for now** — see "KMS status" below. | Wired but degraded; cTRNG path remains live. |
-| `KMS_COSIGNER_PUBKEY` | **Leave empty for now**. | Same. |
+| `KMS_COSIGNER_KEY_ID` | Run the one-time setup script (below) — creates the key on Orbitport once and prints the KeyId. | |
+| `KMS_COSIGNER_PUBKEY` | Comes from the same one-time setup. | Pinned in the viewer too, for verification independence. |
 | `SWARM_BEE_URL` | Default `https://api.gateway.ethswarm.org` works. If you self-host a Bee node, point here. | |
 | `SWARM_POSTAGE_BATCH_ID` | **Pick up from Áron Soós** at the Swarm booth — they're handing out free gift codes. Or buy via `bee-js` if you have BZZ. | This is paid storage credit. Without it, every `/api/upload` fails. |
 | `STORAGE_BACKEND` | `swarm` (default). Switch to `ipfs` only if Swarm flakes during demo. | |
@@ -68,18 +68,21 @@ cp .env.example .env
 | `MINTER_PRIVATE_KEY` | The PK whose address you put as `BACKEND_MINTER_ADDR` in `contracts/.env`. **Must be funded with Sepolia ETH** for gas. | If this wallet runs out of gas mid-demo, the mint route returns 502. Top up with the faucet before the live demo. |
 | `REALITY_PROOF_ADDRESS` | From the contract deploy output (Ignition prints it). | |
 | `DEVICE_REGISTRY_ADDRESS` | Same — from the contract deploy output. | |
-| `ENS_PARENT_DOMAIN` | Optional. `realityproof.eth` if you go for the ENS bounty. | |
+| `ENS_PARENT_DOMAIN` | Optional. `realityproof.eth` for the ENS subdomain feature. | |
 | `LOG_LEVEL` | `info` is fine. Set to `debug` if you need to trace. | |
 
-### KMS status — important
+### One-time KMS key setup
 
-The published SDK `@spacecomputer-io/orbitport-sdk-ts@0.1.0` only exposes `ctrng` + `auth`. **`sdk.kms` does not exist on the npm release** even though it's in the SpaceComputer docs site.
+Run once from the repo root, with your Orbitport creds in env:
 
-So `cosignBundle()` in `apps/api/src/services/orbitport.service.ts` is a no-op stub that returns `null`. The bundle gets `spaceFabric.cosmoSig: null` with `experimental: true`, and the viewer's `verifyCosmoSig` tolerates this.
+```bash
+ORBITPORT_CLIENT_ID=… ORBITPORT_CLIENT_SECRET=… \
+  pnpm --filter @proof-of-reality/api exec tsx scripts/create-kms-key.ts
+```
 
-**The cTRNG path still works fully** — that's the SpaceComputer integration that lives in our trust chain right now. The KMS co-signature is a stretch goal.
+It prints `KMS_COSIGNER_KEY_ID=…` and the full create-key response. Find the public key field in the response (look for `PublicKey` / `PubKey` / `KeyMaterial`) and paste both values into `apps/api/.env`. Don't run the script again — you'd create a second key and burn quota.
 
-To wire KMS for real once you confirm the JSON-RPC method names with SpaceComputer mentors (Filip @elrondjr, Amir @am_ylm, Pedro @zkpedro), follow the comment block in `cosignBundle()` — you can call the JSON-RPC endpoint manually using `sdk().auth.getValidToken()` for the bearer token.
+If KMS is unavailable mid-demo, `cosignBundle()` returns `null` and the bundle is minted with `spaceFabric.experimental: true`. The viewer's `verifyCosmoSig` tolerates this — the cTRNG path still gives us the satellite signature on every scan.
 
 ### Deploy
 
@@ -152,11 +155,12 @@ After everything else is set up:
 1. **Generate two wallets** (deployer + backend minter), fund both with Sepolia ETH from a faucet
 2. **Deploy contracts** → note the two addresses
 3. **Get a Swarm postage batch ID** from Áron Soós at the booth
-4. **Generate `IOS_SHARED_SECRET`**: `openssl rand -hex 32`
-5. **Fill `apps/api/.env`** (leave KMS vars empty — see KMS status), deploy backend to Vercel
-6. **Fill `apps/viewer/.env.local`** with addresses + (later) pinned satellite pubkey
-7. **Fill `apps/camera-agent/.env`** with API URL + bearer token
-8. **First `/api/nonce` call** → grab `satSig.pk`, pin it in viewer
+4. **Run the KMS one-time setup script** → paste KeyId + pubkey into backend env
+5. **Generate `IOS_SHARED_SECRET`**: `openssl rand -hex 32`
+6. **Fill `apps/api/.env`**, deploy backend to Vercel
+7. **Fill `apps/viewer/.env.local`** with addresses + pinned KMS pubkey + (later) pinned satellite pubkey
+8. **Fill `apps/camera-agent/.env`** with API URL + bearer token
+9. **First `/api/nonce` call** → grab `satSig.pk`, pin it in viewer
 
 ---
 
