@@ -1,0 +1,11 @@
+{
+  "extends": "@proof-of-reality/tsconfig/node.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": ".",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext"
+  },
+  "include": ["api/**/*", "src/**/*"],
+  "exclude": ["dist", "node_modules"]
+}
