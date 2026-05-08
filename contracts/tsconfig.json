@@ -1,0 +1,12 @@
+{
+  "extends": "../packages/tsconfig/node.json",
+  "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "outDir": "./dist",
+    "rootDir": ".",
+    "resolveJsonModule": true,
+    "types": ["node", "mocha", "chai"]
+  },
+  "include": ["./hardhat.config.ts", "./scripts/**/*", "./test/**/*", "./ignition/**/*"]
+}
