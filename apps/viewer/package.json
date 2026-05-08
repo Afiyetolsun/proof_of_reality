@@ -1,0 +1,30 @@
+{
+  "name": "@proof-of-reality/viewer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@proof-of-reality/proof-bundle": "workspace:*",
+    "@proof-of-reality/attestation": "workspace:*",
+    "@proof-of-reality/contracts-abi": "workspace:*",
+    "@proof-of-reality/verified-swarm-fetch": "workspace:*",
+    "next": "^15.0.3",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "viem": "^2.21.45"
+  },
+  "devDependencies": {
+    "@proof-of-reality/tsconfig": "workspace:*",
+    "@types/node": "^22.7.5",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "typescript": "^5.6.3"
+  }
+}
