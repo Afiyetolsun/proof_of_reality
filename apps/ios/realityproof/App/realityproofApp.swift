@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct voxelio_web3App: App {
+struct realityproofApp: App {
     var body: some Scene {
         WindowGroup {
             RootView()
