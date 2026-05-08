@@ -61,7 +61,11 @@ export async function cosignBundle(bundleHashHex: `0x${string}`): Promise<`0x${s
     const r = await sdk().kms.sign({
       keyId,
       message: bundleHashHex,
-      signingAlgorithm: "ECDSA_SHA_256",
+      // Our KMS key is created in the ETHEREUM scheme (ECC_SECG_P256K1) so we
+      // can pin its uncompressed pubkey in the viewer and verify with noble's
+      // secp256k1 directly — no GetPublicKey RPC needed (Orbitport doesn't
+      // expose one).
+      signingAlgorithm: "ETHEREUM_SECP256K1",
       messageType: "DIGEST",
     });
     const sig = (r.data as { Signature?: string }).Signature;
