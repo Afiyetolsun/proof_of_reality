@@ -14,12 +14,18 @@ struct ProofHistoryView: View {
             } else {
                 List {
                     ForEach(records) { record in
-                        // NavigationLink(value:) reliably triggers the
-                        // .navigationDestination(for:) below — Button +
-                        // state-bound .navigationDestination(item:) inside
-                        // a List sometimes swallows the first tap, which
-                        // is why opening felt flaky / required two taps.
-                        NavigationLink(value: record) {
+                        // Inline-destination NavigationLink. Both the
+                        // value+destination(for:) form and the
+                        // Button + state-bound destination(item:) form
+                        // misbehave when ProofHistoryView is itself a
+                        // pushed destination — taps fire but the new
+                        // view ends up in the wrong stack frame.
+                        NavigationLink {
+                            ProofSummaryView(
+                                payload: payload(for: record),
+                                onDone: {}
+                            )
+                        } label: {
                             row(for: record)
                         }
                     }
@@ -31,9 +37,6 @@ struct ProofHistoryView: View {
         .navigationTitle("History")
         .navigationBarTitleDisplayMode(.inline)
         .task { await reload() }
-        .navigationDestination(for: ProofRecord.self) { record in
-            ProofSummaryView(payload: payload(for: record), onDone: {})
-        }
     }
 
     private var emptyState: some View {
@@ -79,7 +82,7 @@ struct ProofHistoryView: View {
 
     /// Reload off the main thread. ProofHistory.loadAll iterates folders,
     /// JSON-decodes each bundle, and SHA-256-hashes it — fast per-record
-    /// but accumulating delays were enough to make taps feel sluggish.
+    /// but accumulating delays were enough to make the list interactive late.
     private func reload() async {
         isLoading = true
         let loaded = await Task.detached(priority: .userInitiated) {
