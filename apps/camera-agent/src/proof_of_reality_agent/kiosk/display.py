@@ -19,3 +19,6 @@ class KioskDisplay:
 
     def show_success(self, url: str) -> None:
         print(f"[kiosk] ✅ minted: {url}", flush=True)
+
+    def show_failure(self, reason: str) -> None:
+        print(f"[kiosk] ❌ {reason}", flush=True)

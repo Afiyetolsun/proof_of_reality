@@ -1,21 +1,35 @@
-"""Python mirror of @proof-of-reality/proof-bundle's canonicalize + bundleHash.
+"""ProofBundle construction + canonical SHA-256 hash for the B2B path.
 
-CRITICAL: this MUST produce byte-for-byte identical output to the TypeScript
-implementation in `packages/proof-bundle/src/canonical.ts`. CI gates this with
-a shared fixture. If you change one, change the other.
+Bundle shape MUST match voxelio_web3/Core/ProofSession/ProofBundle.swift —
+that's what the backend hashes on /api/upload, and the on-chain bundleHash
+is `sha256(canonicalJSON(bundle))`. Drift here breaks every proof.
+
+Canonicalization mirrors iOS's `JSONEncoder.sortedKeys + withoutEscapingSlashes`:
+  - object keys sorted lexicographically (recursively)
+  - arrays preserve order
+  - no insignificant whitespace
+  - no escaped slashes (Swift's withoutEscapingSlashes behaviour)
+
+Tested: cross-language fixture parity is asserted by smoke-mint.ts on the
+backend side — both languages must hash the same bundle to the same digest.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 from pathlib import Path
 from typing import Any
 
-from Crypto.Hash import keccak
 
+# ---------------------------------------------------------------------------
+# Canonical encoding
+# ---------------------------------------------------------------------------
 
-def canonicalize(value: Any) -> str:
+def canonical_json(value: Any) -> str:
+    """Produce the same bytes that Swift's JSONEncoder.sortedKeys does for our
+    ProofBundle shape."""
     if value is None:
         return "null"
     if isinstance(value, bool):
@@ -24,134 +38,134 @@ def canonicalize(value: Any) -> str:
         return str(value)
     if isinstance(value, float):
         if not (value == value) or value in (float("inf"), float("-inf")):
-            raise ValueError("non-finite numbers not allowed")
+            raise ValueError("non-finite numbers not allowed in bundle")
+        # Match Swift's default Double encoding
         return json.dumps(value)
     if isinstance(value, str):
         return json.dumps(value, ensure_ascii=False)
     if isinstance(value, list):
-        return "[" + ",".join(canonicalize(v) for v in value) + "]"
+        return "[" + ",".join(canonical_json(v) for v in value) + "]"
     if isinstance(value, dict):
-        keys = sorted(k for k, v in value.items() if v is not None)
-        parts = []
-        for k in keys:
-            parts.append(json.dumps(k, ensure_ascii=False) + ":" + canonicalize(value[k]))
+        keys = sorted(k for k, v in value.items())
+        parts = [json.dumps(k, ensure_ascii=False) + ":" + canonical_json(value[k]) for k in keys]
         return "{" + ",".join(parts) + "}"
-    raise TypeError(f"canonicalize: unsupported type {type(value).__name__}")
+    raise TypeError(f"canonical_json: unsupported type {type(value).__name__}")
 
 
-def keccak256(data: bytes) -> bytes:
-    h = keccak.new(digest_bits=256)
-    h.update(data)
-    return h.digest()
+def sha256_hex(data: bytes) -> str:
+    """Lowercase hex digest, no 0x prefix (matches iOS ProofHasher.sha256)."""
+    return hashlib.sha256(data).hexdigest()
 
 
-def hash_canonical(value: Any) -> str:
-    canon = canonicalize(value)
-    return "0x" + keccak256(canon.encode("utf-8")).hex()
+def bundle_hash_hex(bundle: dict[str, Any]) -> str:
+    """0x-prefixed SHA-256 of canonical bundle JSON (what gets minted on-chain)."""
+    return "0x" + sha256_hex(canonical_json(bundle).encode("utf-8"))
+
+
+# ---------------------------------------------------------------------------
+# ProofBundle dataclasses (mirror iOS shape)
+# ---------------------------------------------------------------------------
+
+@dataclass
+class FileRef:
+    name: str
+    sha256: str
+    bytes: int
+
+
+@dataclass
+class DeviceInfo:
+    model: str
+    osVersion: str
+    bundleId: str
 
 
 @dataclass
 class CosmicNonce:
-    value: str
-    src: str
-    sat_sig: "SatSig"
-    issued_at: int
+    """Whatever /api/nonce returned — we pass-through into the bundle."""
+    value: str           # hex string
+    sat_sig: str         # may be ""
+    sat_pk: str | None   # informational; not in bundle JSON
+    src: str             # informational
+    expires_at: int
 
 
 @dataclass
-class SatSig:
-    value: str
-    pk: str
+class CaptureSession:
+    """Bookkeeping for the capture pipeline (DepthAI etc.)."""
+    started_at: int = 0
+    ended_at: int = 0
+    frame_count: int = 0
 
 
 @dataclass
 class ProofBundle:
-    """Mirror of the TS schema. Build incrementally; serialize at the end."""
+    """
+    iOS-equivalent shape. Field names + ordering chosen to hash byte-identically
+    to voxelio_web3 ProofBundle.swift.
+    """
+    version: int
+    mode: str               # "stereoFusion" | "objectCapture" | "roomPlan"
+    createdAt: int
+    nonce: str              # cTRNG value
+    satSig: str             # may be "" when satellite is out of coverage
+    nonceExpiresAt: int
+    scene: FileRef
+    audio: FileRef | None
+    sensorsHash: str        # sha256 of an opaque sensor blob
+    device: DeviceInfo
 
-    version: str = "1.0"
-    mode: str = "stereoFusion"
-    device: dict[str, Any] = field(default_factory=dict)
-    capture: dict[str, Any] = field(default_factory=dict)
-    nonce: dict[str, Any] = field(default_factory=dict)
-    space_fabric: dict[str, Any] = field(default_factory=lambda: {
-        "cosmoSig": None, "kmsPk": None, "kmsKeyId": None, "experimental": True,
-    })
-    sensors: dict[str, Any] = field(default_factory=dict)
-    attestation: dict[str, Any] = field(default_factory=dict)
+    def to_canonical_dict(self) -> dict[str, Any]:
+        d = asdict(self)
+        # asdict() produces { audio: None } when None; keep that — both
+        # canonical_json and Swift's encoder emit `null` for it, so the
+        # cross-language hash stays consistent.
+        return d
 
-    def device_signing_hash(self) -> str:
-        """Hash of bundle MINUS the spaceFabric block — what the device key signs."""
-        d = self._to_dict()
-        d.pop("spaceFabric", None)
-        return hash_canonical(d)
+    def hash_hex(self) -> str:
+        return bundle_hash_hex(self.to_canonical_dict())
 
-    def attach_device_sig(self, sig_hex: str) -> None:
-        if self.attestation.get("type") != "deviceSE":
-            raise ValueError("attach_device_sig requires deviceSE attestation type")
-        self.attestation["deviceSE"]["deviceSig"] = sig_hex
-
-    def to_json(self) -> bytes:
-        return canonicalize(self._to_dict()).encode("utf-8")
-
-    def _to_dict(self) -> dict[str, Any]:
-        return {
-            "version": self.version,
-            "mode": self.mode,
-            "device": self.device,
-            "capture": self.capture,
-            "nonce": self.nonce,
-            "spaceFabric": self.space_fabric,
-            "sensors": self.sensors,
-            "attestation": self.attestation,
-        }
+    def canonical_bytes(self) -> bytes:
+        return canonical_json(self.to_canonical_dict()).encode("utf-8")
 
 
-def bundle_for_signing(
+# ---------------------------------------------------------------------------
+# Bundle builder
+# ---------------------------------------------------------------------------
+
+def build_bundle(
     *,
     nonce: CosmicNonce,
     scene_path: Path,
-    session: Any,
-    device_addr: str,
-    org_addr: str,
-    vendor: str,
+    audio_path: Path | None,
+    session: CaptureSession,
+    device_model: str = "OAK-4-D",
+    device_os: str = "luxonis-os/5.15",
+    bundle_id: str = "io.voxelio.b2b.camera",
+    mode: str = "stereoFusion",
 ) -> ProofBundle:
-    """Build a ProofBundle ready for device signing (no cosmoSig yet)."""
-    bundle = ProofBundle()
-    bundle.device = {
-        "model": "OAK-4-D",
-        "os": "luxonis-os/5.15",
-        "appVersion": "0.1.0",
-    }
-    bundle.capture = {
-        "startedAt": session.started_at,
-        "endedAt": session.ended_at,
-        "frames": session.frame_count,
-        "sceneFormat": "glb",
-    }
-    bundle.nonce = {
-        "value": nonce.value,
-        "src": nonce.src,
-        "satSig": {"value": nonce.sat_sig.value, "pk": nonce.sat_sig.pk},
-        "issuedAt": nonce.issued_at,
-        "binding": ["visualQR"],
-    }
-    bundle.sensors = {"imu": "inline-base64-stub"}
-    bundle.attestation = {
-        "type": "deviceSE",
-        "deviceSE": {
-            "deviceAddr": device_addr,
-            "deviceSig": "0x",  # filled by attach_device_sig
-            "vendor": vendor,
-        },
-    }
-    return bundle
+    """Build a fresh ProofBundle. Hashes scene (and audio if present) to fill
+    the FileRef SHA-256s; computes a sensorsHash placeholder."""
+    scene_bytes = scene_path.read_bytes()
+    scene_ref = FileRef(name=scene_path.name, sha256=sha256_hex(scene_bytes), bytes=len(scene_bytes))
 
+    audio_ref: FileRef | None = None
+    if audio_path is not None and audio_path.exists():
+        audio_bytes = audio_path.read_bytes()
+        audio_ref = FileRef(name=audio_path.name, sha256=sha256_hex(audio_bytes), bytes=len(audio_bytes))
 
-def finalize_bundle(bundle: ProofBundle, *, cosmo_sig: str | None, kms_pk: str | None, kms_key_id: str | None) -> ProofBundle:
-    bundle.space_fabric = {
-        "cosmoSig": cosmo_sig,
-        "kmsPk": kms_pk,
-        "kmsKeyId": kms_key_id,
-        "experimental": True,
-    }
-    return bundle
+    sensors_blob = f"frames={session.frame_count};started={session.started_at};ended={session.ended_at}"
+    sensors_hash = sha256_hex(sensors_blob.encode("utf-8"))
+
+    return ProofBundle(
+        version=1,
+        mode=mode,
+        createdAt=session.started_at or int(time.time()),
+        nonce=nonce.value,
+        satSig=nonce.sat_sig,
+        nonceExpiresAt=nonce.expires_at,
+        scene=scene_ref,
+        audio=audio_ref,
+        sensorsHash=sensors_hash,
+        device=DeviceInfo(model=device_model, osVersion=device_os, bundleId=bundle_id),
+    )
