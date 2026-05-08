@@ -1,4 +1,4 @@
-import { runVerification } from "@/lib/verify";
+import { runVerification, type VerificationCheck } from "@/lib/verify";
 import { getProof } from "@/lib/chain";
 
 interface PageProps {
@@ -33,7 +33,7 @@ export default async function TokenPage({ params }: PageProps) {
       </p>
       <h2>Verification</h2>
       <ul>
-        {checks.map((c) => (
+        {checks.map((c: VerificationCheck) => (
           <li key={c.name} style={{ color: c.ok ? "green" : "crimson" }}>
             {c.ok ? "✅" : "❌"} <b>{c.name}</b> — {c.detail}
           </li>

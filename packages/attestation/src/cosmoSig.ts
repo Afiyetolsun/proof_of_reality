@@ -41,10 +41,10 @@ export function verifyCosmoSig(args: {
   const digest = sha256(message); // KMS signs SHA-256 of the digest
   const sig = hexToBytes(args.cosmoSig);
   const pk = hexToBytes(args.kmsPk);
-  // noble accepts DER via Signature.fromDER; the Orbitport KMS returns DER.
+  // The Orbitport KMS returns ASN.1 DER; convert to compact r||s before verify.
   try {
-    const signature = p256.Signature.fromDER(sig);
-    const ok = p256.verify(signature, digest, pk);
+    const compact = p256.Signature.fromDER(sig).toCompactRawBytes();
+    const ok = p256.verify(compact, digest, pk);
     return ok ? { ok: true } : { ok: false, reason: "p256 verify returned false" };
   } catch (e) {
     return { ok: false, reason: `cosmoSig parse failed: ${(e as Error).message}` };

@@ -1,8 +1,8 @@
-import { Router } from "express";
+import { Router, type Router as RouterT } from "express";
 import { getCosmicNonce } from "../services/orbitport.service.js";
 import { ApiError } from "../middleware/error.middleware.js";
 
-export const nonceRouter = Router();
+export const nonceRouter: RouterT = Router();
 
 /**
  * POST /api/nonce — relay a fresh cosmic nonce from SpaceComputer Orbitport.

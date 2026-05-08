@@ -1,13 +1,11 @@
 import { expect } from "chai";
-import { network } from "hardhat";
+import hre from "hardhat";
 import { keccak256, toBytes } from "viem";
-
-const { viem } = await network.connect();
 
 describe("DeviceRegistry", () => {
   async function deploy() {
-    const [_deployer, org1, org2, deviceWallet] = await viem.getWalletClients();
-    const registry = await viem.deployContract("DeviceRegistry", []);
+    const [_deployer, org1, org2, deviceWallet] = await hre.viem.getWalletClients();
+    const registry = await hre.viem.deployContract("DeviceRegistry", []);
     return { registry, org1, org2, deviceWallet };
   }
 

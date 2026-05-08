@@ -1,11 +1,15 @@
 {
-  "extends": "../packages/tsconfig/node.json",
+  "extends": "../packages/tsconfig/base.json",
   "compilerOptions": {
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "target": "ES2022",
+    "lib": ["ES2022"],
     "outDir": "./dist",
     "rootDir": ".",
+    "esModuleInterop": true,
     "resolveJsonModule": true,
+    "noUncheckedIndexedAccess": false,
     "types": ["node", "mocha", "chai"]
   },
   "include": ["./hardhat.config.ts", "./scripts/**/*", "./test/**/*", "./ignition/**/*"]

@@ -46,27 +46,30 @@ export async function getCosmicNonce(): Promise<CosmicNonce> {
 /**
  * Co-sign a 32-byte bundle hash with the SpaceComputer KMS.
  *
- * The KMS is marked experimental — we tolerate failures by returning null,
- * letting /api/upload embed an empty cosmoSig and flag spaceFabric.experimental=true.
+ * NOTE: @spacecomputer-io/orbitport-sdk-ts@0.1.0 (currently published on npm)
+ * exposes only ctrng + auth. KMS exists in their docs site as JSON-RPC at
+ *   POST {ORBITPORT_API_URL}/api/v1/rpc
+ * but isn't surfaced through the SDK yet. To wire it without the SDK:
+ *
+ *   const token = await sdk().auth.getValidToken();
+ *   const r = await fetch(`${env().ORBITPORT_API_URL}/api/v1/rpc`, {
+ *     method: "POST",
+ *     headers: {
+ *       Authorization: `Bearer ${token}`,
+ *       "Content-Type": "application/json",
+ *     },
+ *     body: JSON.stringify({
+ *       jsonrpc: "2.0", id: Date.now(),
+ *       method: "kms.sign",  // exact method name TBD — confirm at booth
+ *       params: { keyId, message: bundleHashHex,
+ *                 signingAlgorithm: "ECDSA_SHA_256", messageType: "DIGEST" },
+ *     }),
+ *   });
+ *
+ * For the hackathon: degrade gracefully. The bundle's spaceFabric.experimental
+ * flag is true; the viewer's verifyCosmoSig tolerates a null cosmoSig. The
+ * cTRNG path remains the primary SpaceComputer integration for the bounty.
  */
-export async function cosignBundle(bundleHashHex: `0x${string}`): Promise<`0x${string}` | null> {
-  const keyId = env().KMS_COSIGNER_KEY_ID;
-  if (!keyId) {
-    console.warn("[orbitport] KMS_COSIGNER_KEY_ID not set; skipping cosign");
-    return null;
-  }
-  try {
-    const r = await sdk().kms.sign({
-      keyId,
-      message: bundleHashHex,
-      signingAlgorithm: "ECDSA_SHA_256",
-      messageType: "DIGEST",
-    });
-    const sig = (r.data as { Signature?: string }).Signature;
-    if (!sig) return null;
-    return ("0x" + sig.replace(/^0x/, "")) as `0x${string}`;
-  } catch (e) {
-    console.warn("[orbitport] cosign failed:", (e as Error).message);
-    return null;
-  }
+export async function cosignBundle(_bundleHashHex: `0x${string}`): Promise<`0x${string}` | null> {
+  return null;
 }

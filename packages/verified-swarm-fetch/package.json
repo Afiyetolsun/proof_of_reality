@@ -18,8 +18,7 @@
     "test": "node --test --experimental-strip-types src/**/*.test.ts"
   },
   "dependencies": {
-    "@noble/hashes": "^1.5.0",
-    "viem": "^2.21.45"
+    "@noble/hashes": "^1.5.0"
   },
   "devDependencies": {
     "@proof-of-reality/tsconfig": "workspace:*",

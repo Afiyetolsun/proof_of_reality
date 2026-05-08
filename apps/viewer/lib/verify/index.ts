@@ -13,7 +13,9 @@ export interface VerificationCheck {
 }
 
 const SWARM_GATEWAY = process.env.NEXT_PUBLIC_SWARM_GATEWAY ?? "https://api.gateway.ethswarm.org";
-const KMS_PUBKEY = (process.env.NEXT_PUBLIC_KMS_COSIGNER_PUBKEY ?? null) as `0x${string}` | null;
+const RAW_KMS_PUBKEY = process.env.NEXT_PUBLIC_KMS_COSIGNER_PUBKEY;
+const KMS_PUBKEY: `0x${string}` | null =
+  RAW_KMS_PUBKEY && RAW_KMS_PUBKEY.startsWith("0x") ? (RAW_KMS_PUBKEY as `0x${string}`) : null;
 
 export async function runVerification(proof: unknown): Promise<VerificationCheck[]> {
   const checks: VerificationCheck[] = [];
@@ -40,8 +42,8 @@ export async function runVerification(proof: unknown): Promise<VerificationCheck
   // 2. SpaceComputer KMS co-signature
   const cosmo = verifyCosmoSig({
     bundleHashBeforeSpaceFabric: deviceSigningHash(bundle),
-    cosmoSig: bundle.spaceFabric.cosmoSig,
-    kmsPk: KMS_PUBKEY ?? bundle.spaceFabric.kmsPk,
+    cosmoSig: (bundle.spaceFabric.cosmoSig ?? null) as `0x${string}` | null,
+    kmsPk: (KMS_PUBKEY ?? bundle.spaceFabric.kmsPk ?? null) as `0x${string}` | null,
     experimentalAllowed: bundle.spaceFabric.experimental,
   });
   checks.push({

@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type Router as RouterT } from "express";
 import { z } from "zod";
 import { mintRealityProof } from "../services/chain.service.js";
 import { ApiError } from "../middleware/error.middleware.js";
@@ -18,7 +18,7 @@ const MintBody = z.object({
   mode: z.union([z.literal(0), z.literal(1), z.literal(2)]),
 });
 
-export const mintRouter = Router();
+export const mintRouter: RouterT = Router();
 
 mintRouter.post("/", async (req, res, next) => {
   try {

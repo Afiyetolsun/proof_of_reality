@@ -1,13 +1,13 @@
 import { expect } from "chai";
-import { network } from "hardhat";
+import hre from "hardhat";
 import { keccak256, toBytes, type Address } from "viem";
-
-const { viem } = await network.connect();
 
 describe("RealityProof", () => {
   async function deploy() {
-    const [deployer, minter, recipient, other] = await viem.getWalletClients();
-    const realityProof = await viem.deployContract("RealityProof", [deployer.account.address]);
+    const [deployer, minter, recipient, other] = await hre.viem.getWalletClients();
+    const realityProof = await hre.viem.deployContract("RealityProof", [
+      deployer.account.address,
+    ]);
     const MINTER_ROLE = keccak256(toBytes("MINTER_ROLE"));
     await realityProof.write.grantRole([MINTER_ROLE, minter.account.address]);
     return { realityProof, deployer, minter, recipient, other, MINTER_ROLE };
@@ -53,7 +53,7 @@ describe("RealityProof", () => {
 
     const tokenId = await realityProof.read.nextTokenId();
     expect(tokenId).to.equal(1n);
-    expect(await realityProof.read.ownerOf([1n])).to.equal(
+    expect((await realityProof.read.ownerOf([1n])).toLowerCase()).to.equal(
       recipient.account.address.toLowerCase(),
     );
   });

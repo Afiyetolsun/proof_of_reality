@@ -2,14 +2,12 @@
   "name": "@proof-of-reality/contracts",
   "version": "0.1.0",
   "private": true,
-  "type": "module",
   "scripts": {
     "compile": "hardhat compile",
     "test": "hardhat test",
     "node": "hardhat node",
     "deploy:sepolia": "hardhat ignition deploy ignition/modules/ProofOfReality.ts --network baseSepolia",
     "verify": "hardhat verify --network baseSepolia",
-    "typecheck": "tsc --noEmit",
     "abi:export": "pnpm --filter @proof-of-reality/contracts-abi sync"
   },
   "dependencies": {

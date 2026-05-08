@@ -1,10 +1,10 @@
-import { Router } from "express";
+import { Router, type Router as RouterT } from "express";
 import { z } from "zod";
 import { isDeviceActive } from "../services/chain.service.js";
 import { ApiError } from "../middleware/error.middleware.js";
 import type { Address } from "viem";
 
-export const deviceRouter = Router();
+export const deviceRouter: RouterT = Router();
 
 /**
  * GET /api/device/:addr — public lookup (used by the viewer to verify device sigs).

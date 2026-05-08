@@ -13,15 +13,12 @@ const config: HardhatUserConfig = {
     settings: {
       optimizer: { enabled: true, runs: 200 },
       viaIR: true,
+      evmVersion: "cancun",
     },
   },
   networks: {
-    hardhat: {
-      type: "edr",
-    },
+    hardhat: {},
     baseSepolia: {
-      type: "http",
-      chainType: "l2",
       url: BASE_SEPOLIA_RPC ?? "https://sepolia.base.org",
       accounts: DEPLOYER_PK ? [DEPLOYER_PK] : [],
       chainId: 84532,

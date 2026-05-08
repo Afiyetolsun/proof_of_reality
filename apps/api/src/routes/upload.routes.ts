@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type Router as RouterT } from "express";
 import multer from "multer";
 import {
   parseProofBundle,
@@ -18,7 +18,7 @@ const upload = multer({
   limits: { fileSize: 50 * 1024 * 1024 }, // 50 MB cap
 });
 
-export const uploadRouter = Router();
+export const uploadRouter: RouterT = Router();
 
 /**
  * POST /api/upload — multipart/form-data

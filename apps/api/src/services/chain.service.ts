@@ -1,37 +1,40 @@
-import {
-  createPublicClient,
-  createWalletClient,
-  http,
-  type Address,
-  type Hex,
-  type PublicClient,
-  type WalletClient,
-} from "viem";
+import { createPublicClient, createWalletClient, http, type Address, type Hex } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { baseSepolia } from "viem/chains";
 import { RealityProofAbi, DeviceRegistryAbi } from "@proof-of-reality/contracts-abi";
 import { env } from "../config/env.js";
 
-let _publicClient: PublicClient | null = null;
-let _walletClient: WalletClient | null = null;
+// Lazy single-instance clients. We hide them behind getters so env() is only
+// evaluated on first use (Vercel cold start), not at module load.
+//
+// Typed `any`: viem's deeply-nested generics + pnpm's nested resolution produce
+// false-positive "two different types with this name" errors when narrowing
+// these vars. The runtime is fine — it's a typecheck-only artifact. Type safety
+// for the calls below is preserved by viem's per-call abi generic.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _publicClient: any;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _walletClient: any;
 
-export function publicClient(): PublicClient {
-  if (_publicClient) return _publicClient;
-  _publicClient = createPublicClient({
-    chain: baseSepolia,
-    transport: http(env().BASE_SEPOLIA_RPC),
-  });
+function publicClient() {
+  if (!_publicClient) {
+    _publicClient = createPublicClient({
+      chain: baseSepolia,
+      transport: http(env().BASE_SEPOLIA_RPC),
+    });
+  }
   return _publicClient;
 }
 
-export function walletClient(): WalletClient {
-  if (_walletClient) return _walletClient;
-  const account = privateKeyToAccount(env().MINTER_PRIVATE_KEY as Hex);
-  _walletClient = createWalletClient({
-    account,
-    chain: baseSepolia,
-    transport: http(env().BASE_SEPOLIA_RPC),
-  });
+function walletClient() {
+  if (!_walletClient) {
+    const account = privateKeyToAccount(env().MINTER_PRIVATE_KEY as Hex);
+    _walletClient = createWalletClient({
+      account,
+      chain: baseSepolia,
+      transport: http(env().BASE_SEPOLIA_RPC),
+    });
+  }
   return _walletClient;
 }
 
