@@ -1,4 +1,11 @@
-import { createPublicClient, createWalletClient, http, type Address, type Hex } from "viem";
+import {
+  createPublicClient,
+  createWalletClient,
+  decodeEventLog,
+  http,
+  type Address,
+  type Hex,
+} from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { baseSepolia } from "viem/chains";
 import { RealityProofAbi, DeviceRegistryAbi } from "@proof-of-reality/contracts-abi";
@@ -38,6 +45,12 @@ function walletClient() {
   return _walletClient;
 }
 
+export interface MintResult {
+  txHash: Hex;
+  tokenId: string;
+  ensName: string | null;
+}
+
 export async function mintRealityProof(args: {
   to: Address;
   bundleHash: Hex;
@@ -50,9 +63,10 @@ export async function mintRealityProof(args: {
   attestor: Address;
   capturedAt: bigint;
   mode: 0 | 1 | 2;
-}): Promise<Hex> {
+}): Promise<MintResult> {
   const wallet = walletClient();
-  const txHash = await wallet.writeContract({
+  const pc = publicClient();
+  const txHash = (await wallet.writeContract({
     address: env().REALITY_PROOF_ADDRESS as Address,
     abi: RealityProofAbi,
     functionName: "mint",
@@ -69,8 +83,34 @@ export async function mintRealityProof(args: {
       args.capturedAt,
       args.mode,
     ],
-  } as never);
-  return txHash;
+  } as never)) as Hex;
+
+  // Wait for the receipt and decode RealityMinted to extract the tokenId.
+  // iOS shows this in the success view, viewer links to /token/[id].
+  let tokenId = "0";
+  try {
+    const receipt = await pc.waitForTransactionReceipt({ hash: txHash });
+    for (const log of receipt.logs) {
+      try {
+        const decoded = decodeEventLog({
+          abi: RealityProofAbi,
+          data: log.data,
+          topics: log.topics,
+        }) as { eventName: string; args: { tokenId?: bigint } };
+        if (decoded.eventName === "RealityMinted" && decoded.args.tokenId !== undefined) {
+          tokenId = decoded.args.tokenId.toString();
+          break;
+        }
+      } catch {
+        // not our event — skip
+      }
+    }
+  } catch (e) {
+    // Receipt timed out — return the txHash anyway, tokenId stays "0".
+    console.warn("[chain] receipt wait failed:", (e as Error).message);
+  }
+
+  return { txHash, tokenId, ensName: null };
 }
 
 export async function isDeviceActive(device: Address): Promise<boolean> {

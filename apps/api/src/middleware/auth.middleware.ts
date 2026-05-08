@@ -3,23 +3,27 @@ import { timingSafeEqual } from "node:crypto";
 import { env } from "../config/env.js";
 
 /**
- * Bearer-token middleware. iOS and the camera-agent both send the same shared secret
- * via `Authorization: Bearer <IOS_SHARED_SECRET>`.
+ * Shared-secret middleware. iOS sends `X-Voxelio-Key: <secret>`; camera-agent
+ * and CLI tools send `Authorization: Bearer <secret>`. Either is accepted —
+ * they're checked against the same IOS_SHARED_SECRET in constant time.
  *
- * This is NOT the cryptographic trust boundary — that's the device/App-Attest signature
- * inside the bundle. This is just a coarse "stop random internet traffic" filter.
+ * NOT the cryptographic trust boundary — that's the device/App-Attest signature
+ * inside the bundle. This is just a coarse "stop random internet" filter.
  */
 export function authMiddleware(req: Request, res: Response, next: NextFunction): void {
-  const auth = req.header("authorization") ?? "";
-  const m = auth.match(/^Bearer\s+(.+)$/);
-  if (!m) {
-    res.status(401).json({ error: { code: "UNAUTHORIZED", message: "missing bearer token" } });
+  const xKey = req.header("x-voxelio-key");
+  const bearer = req.header("authorization")?.match(/^Bearer\s+(.+)$/)?.[1];
+  const presented = xKey ?? bearer;
+  if (!presented) {
+    res.status(401).json({
+      error: { code: "UNAUTHORIZED", message: "missing X-Voxelio-Key or Bearer token" },
+    });
     return;
   }
-  const provided = Buffer.from(m[1]!);
+  const provided = Buffer.from(presented);
   const expected = Buffer.from(env().IOS_SHARED_SECRET);
   if (provided.length !== expected.length || !timingSafeEqual(provided, expected)) {
-    res.status(401).json({ error: { code: "UNAUTHORIZED", message: "bad bearer token" } });
+    res.status(401).json({ error: { code: "UNAUTHORIZED", message: "bad shared secret" } });
     return;
   }
   next();

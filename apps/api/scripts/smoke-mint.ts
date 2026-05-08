@@ -1,23 +1,25 @@
 /**
- * End-to-end smoke test: /api/nonce → /api/upload → /api/mint
+ * End-to-end smoke test mimicking the iOS app's exact wire protocol.
  *
- * Constructs a minimal ProofBundle with type="appAttest" (the backend's
- * appAttest verifier is a stub that accepts any well-formed input — that's
- * what makes this useful as a local smoke test before iOS / camera-agent
- * are producing real signed bundles).
+ *   1. POST /api/nonce       (X-Voxelio-Key auth, expects { nonce, satSig, expiresAt })
+ *   2. POST /api/upload      (multipart bundle + scene + optional audio,
+ *                             SHA-256 of bundle bytes is the bundleHash)
+ *   3. POST /api/mint        (iOS shape — no `to`, no `attestor`,
+ *                             attestation as base64 or "MOCK")
+ *
+ * Reproduces what voxelio_web3 (iOS app) does, against our backend, so we
+ * can verify the wire protocol without booting Xcode.
  *
  * Usage:
- *   # in one terminal: pnpm --filter @proof-of-reality/api dev
- *   # in another:
+ *   # terminal A: pnpm --filter @proof-of-reality/api dev
+ *   # terminal B:
  *   pnpm --filter @proof-of-reality/api exec tsx scripts/smoke-mint.ts
  */
-try { process.loadEnvFile(".env"); } catch {}
+try {
+  process.loadEnvFile(".env");
+} catch {}
 
-import {
-  parseProofBundle,
-  deviceSigningHash,
-  type ProofBundle,
-} from "@proof-of-reality/proof-bundle";
+import { createHash } from "node:crypto";
 
 const API_URL = process.env.SMOKE_API_URL ?? "http://localhost:4000";
 const SECRET = process.env.IOS_SHARED_SECRET;
@@ -26,13 +28,8 @@ if (!SECRET) {
   process.exit(1);
 }
 
-const auth = { Authorization: `Bearer ${SECRET}` };
-
-function bytesToHex(bytes: Uint8Array): `0x${string}` {
-  let h = "0x";
-  for (const b of bytes) h += b.toString(16).padStart(2, "0");
-  return h as `0x${string}`;
-}
+// iOS uses X-Voxelio-Key, no "Bearer" prefix.
+const auth = { "X-Voxelio-Key": SECRET };
 
 // ---- 1. nonce ----
 console.log("→ POST /api/nonce");
@@ -42,61 +39,63 @@ if (!nonceRes.ok) {
   process.exit(1);
 }
 const nonce = (await nonceRes.json()) as {
-  value: `0x${string}`;
+  nonce: string;
+  satSig: string;
+  expiresAt: number;
+  satPk: string | null;
   src: string;
-  satSig: { value: `0x${string}`; pk: `0x${string}` } | null;
-  issuedAt: number;
 };
-console.log(`  ok — value=${nonce.value.slice(0, 18)}…  src=${nonce.src}  satSig=${nonce.satSig ? "✓" : "null"}`);
+console.log(`  ok — nonce=${nonce.nonce.slice(0, 18)}…  src=${nonce.src}  satSig=${nonce.satSig || "(empty)"}`);
 
-// ---- 2. build bundle ----
+// ---- 2. build iOS-shaped bundle JSON (matches voxelio_web3/ProofBundle.swift) ----
 const now = Math.floor(Date.now() / 1000);
-const bundle: ProofBundle = {
-  version: "1.0",
+const sceneBytes = new Uint8Array(256);
+sceneBytes.set([0x67, 0x6c, 0x62, 0x00], 0); // pseudo-GLB magic
+const sceneSha = createHash("sha256").update(sceneBytes).digest("hex");
+
+const bundle = {
+  version: 1,
   mode: "objectCapture",
-  device: { model: "smoke-test-cli", os: "node", appVersion: "0.0.1" },
-  capture: {
-    startedAt: now - 60,
-    endedAt: now,
-    frames: 100,
-    sceneFormat: "glb",
-  },
-  nonce: {
-    value: nonce.value,
-    src: nonce.src,
-    satSig: nonce.satSig,
-    issuedAt: nonce.issuedAt,
-    binding: ["visualQR"],
-  },
-  spaceFabric: {
-    cosmoSig: null,
-    kmsPk: null,
-    kmsKeyId: null,
-    experimental: true,
-  },
-  sensors: { imu: "test-imu-blob" },
-  attestation: {
-    type: "appAttest",
-    appAttest: {
-      keyId: "smoke-test-key",
-      assertion: Buffer.from("smoke-test-assertion").toString("base64"),
-    },
+  createdAt: now,
+  nonce: nonce.nonce,
+  satSig: nonce.satSig,
+  nonceExpiresAt: nonce.expiresAt,
+  scene: { name: "scene.glb", sha256: sceneSha, bytes: sceneBytes.byteLength },
+  audio: null,
+  sensorsHash: createHash("sha256").update("smoke-test-sensors").digest("hex"),
+  device: {
+    model: "smoke-test-cli",
+    osVersion: "node-22",
+    bundleId: "io.voxelio.smoke",
   },
 };
-parseProofBundle(bundle); // local validation
-console.log(`  innerHash=${deviceSigningHash(bundle).slice(0, 18)}…`);
+
+// iOS canonicalEncode uses JSONEncoder.sortedKeys + withoutEscapingSlashes.
+// Node's JSON.stringify with manually-sorted keys produces the same bytes for
+// the schema we use here (no slashes, no unicode beyond BMP).
+function canonicalSorted(value: unknown): string {
+  if (value === null) return "null";
+  if (typeof value === "number") return JSON.stringify(value);
+  if (typeof value === "string") return JSON.stringify(value);
+  if (typeof value === "boolean") return value ? "true" : "false";
+  if (Array.isArray(value)) return "[" + value.map(canonicalSorted).join(",") + "]";
+  if (typeof value === "object") {
+    const o = value as Record<string, unknown>;
+    const keys = Object.keys(o).sort();
+    return "{" + keys.map((k) => JSON.stringify(k) + ":" + canonicalSorted(o[k])).join(",") + "}";
+  }
+  throw new Error(`canonicalSorted: unsupported ${typeof value}`);
+}
+
+const bundleBytes = new TextEncoder().encode(canonicalSorted(bundle));
+const expectedHash = "0x" + createHash("sha256").update(bundleBytes).digest("hex");
+console.log(`  bundle SHA-256 (iOS-equiv): ${expectedHash.slice(0, 18)}…`);
 
 // ---- 3. upload ----
 console.log("→ POST /api/upload");
-const fakeSceneBytes = new Uint8Array([0x67, 0x6c, 0x62, 0x00, ...new Uint8Array(252)]);
 const fd = new FormData();
-fd.append("scene", new Blob([fakeSceneBytes]), "scene.glb");
-fd.append(
-  "bundle",
-  new Blob([JSON.stringify(bundle)], { type: "application/json" }),
-  "bundle.json",
-);
-
+fd.append("bundle", new Blob([bundleBytes], { type: "application/json" }), "bundle.json");
+fd.append("scene", new Blob([sceneBytes], { type: "model/vnd.usdz+zip" }), bundle.scene.name);
 const uploadRes = await fetch(`${API_URL}/api/upload`, {
   method: "POST",
   headers: auth,
@@ -108,31 +107,31 @@ if (!uploadRes.ok) {
 }
 const upload = (await uploadRes.json()) as {
   swarmRef: string;
-  bundleRef: string;
-  bundleHash: `0x${string}`;
-  cosmoSig: `0x${string}` | null;
-  sceneSize: number;
+  bundleHash: string;
+  bundleRef?: string;
+  cosmoSig: string | null;
+  sceneBytes: number;
 };
 console.log(`  ok — swarmRef=${upload.swarmRef.slice(0, 16)}…  bundleHash=${upload.bundleHash.slice(0, 18)}…`);
-console.log(`  cosmoSig=${upload.cosmoSig ? upload.cosmoSig.slice(0, 18) + "…" : "null (KMS skipped)"}`);
+console.log(`  cosmoSig=${upload.cosmoSig ? upload.cosmoSig.slice(0, 18) + "…" : "null"}`);
+if (upload.bundleHash.toLowerCase() !== expectedHash.toLowerCase()) {
+  console.error(`  ✗ bundleHash mismatch! expected ${expectedHash}, got ${upload.bundleHash}`);
+  process.exit(1);
+}
+console.log("  ✓ backend SHA-256 matches client SHA-256");
 
-// ---- 4. mint ----
+// ---- 4. mint (iOS shape — no `to`, no `attestor`) ----
 console.log("→ POST /api/mint");
-const attestationHex = bytesToHex(new TextEncoder().encode(JSON.stringify(bundle.attestation)));
-// Contract requires non-empty satSig; pad with 0x00 when satellite is offline.
-const satSigHex = nonce.satSig?.value ?? "0x00";
 const mintBody = {
-  to: process.env.SMOKE_RECIPIENT ?? "0x8190b71BbCc424D11102EBC13f993e9129Ebd47A",
-  bundleHash: upload.bundleHash,
   swarmRef: upload.swarmRef,
-  bundleRef: upload.bundleRef,
-  satSig: satSigHex,
-  cosmoSig: upload.cosmoSig ?? "0x00",
-  attestation: attestationHex,
-  attestationType: 0, // appAttest
-  attestor: "0x0000000000000000000000000000000000000000",
-  capturedAt: bundle.capture.startedAt.toString(),
-  mode: 1, // objectCapture
+  bundleRef: `local:${upload.bundleHash.slice(2)}`, // iOS sends local:<sha>
+  bundleHash: upload.bundleHash,
+  satSig: nonce.satSig || "STUB",
+  cosmoSig: upload.cosmoSig ?? "",
+  attestation: Buffer.from("smoke-test-app-attest-assertion").toString("base64"),
+  attestationType: 0,
+  capturedAt: bundle.createdAt,
+  mode: 1,
 };
 
 const mintRes = await fetch(`${API_URL}/api/mint`, {
@@ -144,10 +143,19 @@ if (!mintRes.ok) {
   console.error("  failed:", await mintRes.text());
   process.exit(1);
 }
-const mint = (await mintRes.json()) as { txHash: string; explorerUrl: string };
+const mint = (await mintRes.json()) as {
+  txHash: string;
+  tokenId: string;
+  ensName: string | null;
+  stub: boolean;
+  explorerUrl: string;
+};
 
-console.log("\n✅ minted");
+console.log("\n✅ minted via iOS-shaped wire protocol");
+console.log(`  tokenId:  ${mint.tokenId}`);
 console.log(`  tx:       ${mint.txHash}`);
 console.log(`  explorer: ${mint.explorerUrl}`);
 console.log(`  scene:    https://gateway.pinata.cloud/ipfs/${upload.swarmRef}`);
-console.log(`  bundle:   https://gateway.pinata.cloud/ipfs/${upload.bundleRef}`);
+if (upload.bundleRef) {
+  console.log(`  bundle:   https://gateway.pinata.cloud/ipfs/${upload.bundleRef}`);
+}
