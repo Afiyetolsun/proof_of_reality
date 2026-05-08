@@ -85,11 +85,15 @@ struct ProofHistoryView: View {
     }
 
     private func payload(for record: ProofRecord) -> ProofSummaryPayload {
+        // Forward the persisted mint so reopening a previously-minted scan
+        // shows the success card instead of a Submit button (which would
+        // re-mint the same bundleHash and revert with DuplicateBundle).
         ProofSummaryPayload(
             mode: record.mode,
             bundle: record.bundle,
             hash: record.bundleHash,
-            bundleURL: record.bundleURL
+            bundleURL: record.bundleURL,
+            existingMint: record.mint
         )
     }
 

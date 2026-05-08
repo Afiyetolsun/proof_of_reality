@@ -11,7 +11,10 @@ struct Scene3DPreviewView: UIViewRepresentable {
     func makeUIView(context: Context) -> SCNView {
         let view = SCNView(frame: .zero)
         view.allowsCameraControl = true
-        view.autoenablesDefaultLighting = true
+        // We set up our own lighting; SceneKit's default omni would
+        // double up with the directionals below and create the harsh
+        // grey patches RoomPlan exports show on door / window cutouts.
+        view.autoenablesDefaultLighting = false
         view.defaultCameraController.interactionMode = .orbitTurntable
         view.backgroundColor = UIColor(white: 0.05, alpha: 1)
         view.antialiasingMode = .multisampling4X
@@ -22,7 +25,10 @@ struct Scene3DPreviewView: UIViewRepresentable {
             return view
         }
 
-        addLightingIfMissing(to: scene)
+        applyMaterialFixups(to: scene)
+        addLightingEnvironment(to: scene, background: view.backgroundColor)
+        addLights(to: scene)
+
         let camera = framedCamera(for: scene)
         scene.rootNode.addChildNode(camera)
 
@@ -33,26 +39,59 @@ struct Scene3DPreviewView: UIViewRepresentable {
 
     func updateUIView(_ view: SCNView, context: Context) {}
 
-    /// RoomPlan exports often ship without lights, which makes SceneKit
-    /// render them flat black. Drop in an ambient + a directional fill.
-    private func addLightingIfMissing(to scene: SCNScene) {
-        let hasLight = scene.rootNode.childNodes(passingTest: { node, _ in
-            node.light != nil
-        }).isEmpty == false
-        if hasLight { return }
+    /// RoomPlan / Object Capture exports often ship with single-sided
+    /// materials, baked-in dark transparencies (door cutouts), and a mix
+    /// of lighting models. Normalising everything to physically-based +
+    /// double-sided makes the IBL we set up below render cleanly.
+    private func applyMaterialFixups(to scene: SCNScene) {
+        scene.rootNode.enumerateChildNodes { node, _ in
+            guard let geometry = node.geometry else { return }
+            for material in geometry.materials {
+                material.isDoubleSided = true
+                material.lightingModel = .physicallyBased
+                material.transparencyMode = .default
+            }
+        }
+    }
 
+    /// Image-based environment lighting. Without this, PBR materials look
+    /// matte/grey because they have nothing to reflect. A flat white
+    /// "sky" gives soft, even illumination — the same trick QuickLook
+    /// uses for its USDZ previewer.
+    private func addLightingEnvironment(to scene: SCNScene, background: UIColor?) {
+        scene.lightingEnvironment.contents = UIColor.white
+        scene.lightingEnvironment.intensity = 1.2
+        scene.background.contents = background
+    }
+
+    /// Three-point lighting: bright ambient floor, soft key from front-
+    /// upper-left, gentler fill from the opposite side. No shadow casters
+    /// — RoomPlan walls are thin planes and self-shadow ugly.
+    private func addLights(to scene: SCNScene) {
         let ambient = SCNNode()
         ambient.light = SCNLight()
         ambient.light?.type = .ambient
-        ambient.light?.intensity = 500
+        ambient.light?.intensity = 400
+        ambient.light?.color = UIColor.white
         scene.rootNode.addChildNode(ambient)
 
-        let directional = SCNNode()
-        directional.light = SCNLight()
-        directional.light?.type = .directional
-        directional.light?.intensity = 800
-        directional.eulerAngles = SCNVector3(-Float.pi / 4, Float.pi / 4, 0)
-        scene.rootNode.addChildNode(directional)
+        let key = SCNNode()
+        key.light = SCNLight()
+        key.light?.type = .directional
+        key.light?.intensity = 700
+        key.light?.color = UIColor.white
+        key.light?.castsShadow = false
+        key.eulerAngles = SCNVector3(-Float.pi / 3.5, Float.pi / 6, 0)
+        scene.rootNode.addChildNode(key)
+
+        let fill = SCNNode()
+        fill.light = SCNLight()
+        fill.light?.type = .directional
+        fill.light?.intensity = 350
+        fill.light?.color = UIColor.white
+        fill.light?.castsShadow = false
+        fill.eulerAngles = SCNVector3(Float.pi / 4, -Float.pi / 3, 0)
+        scene.rootNode.addChildNode(fill)
     }
 
     /// Builds a camera node positioned along +Z at a distance proportional
@@ -63,6 +102,7 @@ struct Scene3DPreviewView: UIViewRepresentable {
         let camera = SCNCamera()
         camera.zNear = 0.01
         camera.zFar = 5_000
+        camera.wantsHDR = true
 
         let node = SCNNode()
         node.camera = camera
