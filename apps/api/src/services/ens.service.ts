@@ -18,37 +18,43 @@ import { env } from "../config/env.js";
  * ENS subname publication for Reality NFTs.
  *
  * Each mint gets a subname `vin-<bundleHash[2:14]>.realityproof.eth` on
- * Ethereum Sepolia. We:
- *   1. Call our deployed RealityENSResolver.setProof(subnode, proof) — one tx
- *   2. The subnode is namehash("vin-…realityproof.eth"). Note this requires
- *      the subname to actually exist in the ENS Registry — i.e. someone has
- *      called NameWrapper.setSubnodeRecord(parentNode, label, ...) first.
+ * Ethereum Sepolia. We do two txs per mint:
+ *   1. ENS Registry.setSubnodeRecord(parentNode, labelHash, owner, resolver, ttl)
+ *      → registers the subnode and points it at our custom resolver
+ *   2. RealityENSResolver.setProof(subnode, proof)
+ *      → writes the per-token records (bundleHash, satSig, cosmoSig, etc.)
  *
- * For the demo the backend wallet is delegated as Manager of realityproof.eth
- * via the ENS app, so step (2) — creating the subnode + pointing it at our
- * resolver — happens via NameWrapper directly.
+ * We talk to the ENS Registry directly rather than NameWrapper because
+ * realityproof.eth is currently unwrapped (Registry.owner is the backend
+ * wallet, not the NameWrapper contract). NameWrapper would revert with
+ * OperationProhibited / NameIsNotWrapped on names it doesn't own.
  *
- * If any of this fails (network blip, missing env, etc.) we swallow the
- * error and return null. The mint itself never blocks on ENS publication.
+ * If any step fails we log + return null. The mint itself never blocks
+ * on ENS publication — caller (mint route) decides whether to await.
  */
 
-const NAME_WRAPPER_SEPOLIA: Address = "0x0635513f179D50A207757E05759CbD106d7dFcE8";
+const ENS_REGISTRY_SEPOLIA: Address = "0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e";
 
-const NAME_WRAPPER_ABI = [
+const ENS_REGISTRY_ABI = [
   {
     type: "function",
     name: "setSubnodeRecord",
     stateMutability: "nonpayable",
     inputs: [
-      { name: "parentNode", type: "bytes32" },
-      { name: "label", type: "string" },
+      { name: "node", type: "bytes32" },
+      { name: "label", type: "bytes32" },
       { name: "owner", type: "address" },
       { name: "resolver", type: "address" },
       { name: "ttl", type: "uint64" },
-      { name: "fuses", type: "uint32" },
-      { name: "expiry", type: "uint64" },
     ],
-    outputs: [{ name: "node", type: "bytes32" }],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "owner",
+    stateMutability: "view",
+    inputs: [{ name: "node", type: "bytes32" }],
+    outputs: [{ name: "", type: "address" }],
   },
 ] as const;
 
@@ -145,30 +151,31 @@ export async function publishToEns(input: EnsPublishInput): Promise<EnsPublishRe
 
     const txHashes: Hex[] = [];
 
-    // 1. Create the subname pointing at our resolver. Idempotent — calling
-    //    again on an existing subname just resets owner/resolver/ttl.
+    // 1. Register the subnode + point it at our resolver via ENS Registry.
+    //    For unwrapped names, the parent's Registry.owner can call this
+    //    directly. label is the labelhash (keccak256 of the label string),
+    //    not the string itself — that's the Registry's calling convention.
+    const labelHash = keccak256(toBytes(label));
     try {
       const subnodeTx = await wallet.writeContract({
-        address: NAME_WRAPPER_SEPOLIA,
-        abi: NAME_WRAPPER_ABI,
+        address: ENS_REGISTRY_SEPOLIA,
+        abi: ENS_REGISTRY_ABI,
         functionName: "setSubnodeRecord",
         args: [
           parentNode,
-          label,
+          labelHash,
           input.attestor,                              // owner of the subname
           e.ENS_RESOLVER_ADDRESS as Address,           // our resolver
           0n,                                          // ttl
-          0,                                           // fuses (no restrictions)
-          BigInt(Math.floor(Date.now() / 1000) + 365 * 24 * 60 * 60), // 1y expiry
         ],
       } as never);
       txHashes.push(subnodeTx);
-      await pc.waitForTransactionReceipt({ hash: subnodeTx });
+      const r = await pc.waitForTransactionReceipt({ hash: subnodeTx });
+      if (r.status !== "success") {
+        console.warn(`[ens] setSubnodeRecord tx reverted: ${subnodeTx}`);
+      }
     } catch (e) {
-      // If the backend wallet isn't a manager of realityproof.eth yet, this
-      // fails. Continue to setProof — the user can wire the manager later
-      // and re-run this for past mints.
-      console.warn("[ens] setSubnodeRecord failed (manager not delegated?):", (e as Error).message);
+      console.warn("[ens] setSubnodeRecord failed:", (e as Error).message);
     }
 
     // 2. Publish proof records via our resolver.

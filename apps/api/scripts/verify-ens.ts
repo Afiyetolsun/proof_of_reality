@@ -54,7 +54,10 @@ const RESOLVER_ABI = [
   },
 ] as const;
 
-const NAME = process.argv[2] ?? "vin-d50e0624dbb8.realityproof.eth";
+const RAW = process.argv[2] ?? "vin-d50e0624dbb8.realityproof.eth";
+const PARENT = process.env.ENS_PARENT_NAME ?? "realityproof.eth";
+// If user passed just the label, auto-suffix the parent.
+const NAME = RAW.includes(".") ? RAW : `${RAW}.${PARENT}`;
 const RESOLVER = (process.env.ENS_RESOLVER_ADDRESS ??
   "0xF7ce9F50EBc3CDdC1C5Bfab76f6Bead512361493") as Address;
 const RPC = process.env.ETH_SEPOLIA_RPC ?? "https://ethereum-sepolia-rpc.publicnode.com";
@@ -78,13 +81,17 @@ const registryResolver = (await pc.readContract({
 
 const matches = registryResolver.toLowerCase() === RESOLVER.toLowerCase();
 console.log(`Registry → resolver: ${registryResolver}`);
-console.log(`points at OUR resolver? ${matches ? "✅" : "❌ no — subname is using a different resolver"}`);
+console.log(`points at OUR resolver? ${matches ? "✅" : "❌ no"}`);
 
 if (!matches) {
-  console.log("\n→ This means setSubnodeRecord didn't pass our resolver address.");
-  console.log("  Either ENS_RESOLVER_ADDRESS in Vercel was wrong at mint time,");
-  console.log("  or that mint happened before the resolver was deployed.");
-  process.exit(1);
+  if (registryResolver === "0x0000000000000000000000000000000000000000") {
+    console.log("  → subname doesn't exist in the ENS Registry yet.");
+    console.log("    setSubnodeRecord (publishToEns step 1) didn't land.");
+  } else {
+    console.log("  → subname points at a different resolver. ENS clients won't");
+    console.log("    see our records even if setProof did write.");
+  }
+  console.log("  (Continuing to check our resolver's data anyway.)\n");
 }
 
 const ex = (await pc.readContract({
@@ -94,12 +101,11 @@ const ex = (await pc.readContract({
   args: [node],
 })) as boolean;
 
-console.log(`\nOur resolver → exists[node]: ${ex}`);
+console.log(`Our resolver → exists[node]: ${ex}`);
 
 if (!ex) {
-  console.log("\n→ The subname points at our resolver, but setProof was never called.");
-  console.log("  publishToEns()'s second tx failed silently. Check Vercel logs:");
-  console.log("    https://vercel.com/dashboard → project → Logs → search '[ens]' or '[mint] ENS'");
+  console.log("\n→ setProof (publishToEns step 2) didn't land either.");
+  console.log("  Check Vercel logs for [ens] / [mint] ENS messages.");
   process.exit(1);
 }
 
