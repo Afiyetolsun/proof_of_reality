@@ -2,19 +2,32 @@ import SwiftUI
 
 struct ProofHistoryView: View {
     @State private var records: [ProofRecord] = []
-    @State private var selection: ProofRecord?
+    @State private var isLoading = true
 
     var body: some View {
         Group {
-            if records.isEmpty {
+            if isLoading && records.isEmpty {
+                ProgressView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if records.isEmpty {
                 emptyState
             } else {
                 List {
                     ForEach(records) { record in
-                        Button { selection = record } label: {
+                        // Inline-destination NavigationLink. Both the
+                        // value+destination(for:) form and the
+                        // Button + state-bound destination(item:) form
+                        // misbehave when ProofHistoryView is itself a
+                        // pushed destination — taps fire but the new
+                        // view ends up in the wrong stack frame.
+                        NavigationLink {
+                            ProofSummaryView(
+                                payload: payload(for: record),
+                                onDone: {}
+                            )
+                        } label: {
                             row(for: record)
                         }
-                        .buttonStyle(.plain)
                     }
                     .onDelete(perform: delete)
                 }
@@ -23,12 +36,7 @@ struct ProofHistoryView: View {
         }
         .navigationTitle("History")
         .navigationBarTitleDisplayMode(.inline)
-        .onAppear(perform: reload)
-        .navigationDestination(item: $selection) { record in
-            ProofSummaryView(payload: payload(for: record), onDone: {
-                selection = nil
-            })
-        }
+        .task { await reload() }
     }
 
     private var emptyState: some View {
@@ -67,14 +75,23 @@ struct ProofHistoryView: View {
                     .font(.caption2.monospaced())
                     .foregroundStyle(.tertiary)
             }
-            Spacer()
-            Image(systemName: "chevron.right").foregroundStyle(.tertiary)
+            Spacer(minLength: 0)
         }
         .padding(.vertical, 4)
     }
 
-    private func reload() {
-        records = ProofHistory.loadAll()
+    /// Reload off the main thread. ProofHistory.loadAll iterates folders,
+    /// JSON-decodes each bundle, and SHA-256-hashes it — fast per-record
+    /// but accumulating delays were enough to make the list interactive late.
+    private func reload() async {
+        isLoading = true
+        let loaded = await Task.detached(priority: .userInitiated) {
+            ProofHistory.loadAll()
+        }.value
+        await MainActor.run {
+            self.records = loaded
+            self.isLoading = false
+        }
     }
 
     private func delete(at offsets: IndexSet) {
@@ -85,11 +102,15 @@ struct ProofHistoryView: View {
     }
 
     private func payload(for record: ProofRecord) -> ProofSummaryPayload {
+        // Forward the persisted mint so reopening a previously-minted scan
+        // shows the success card instead of a Submit button (which would
+        // re-mint the same bundleHash and revert with DuplicateBundle).
         ProofSummaryPayload(
             mode: record.mode,
             bundle: record.bundle,
             hash: record.bundleHash,
-            bundleURL: record.bundleURL
+            bundleURL: record.bundleURL,
+            existingMint: record.mint
         )
     }
 

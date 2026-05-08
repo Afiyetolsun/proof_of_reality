@@ -16,9 +16,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "88818F302FADE6C30060C195"
-               BuildableName = "voxelio_web3.app"
-               BlueprintName = "voxelio_web3"
-               ReferencedContainer = "container:voxelio_web3.xcodeproj">
+               BuildableName = "realityproof.app"
+               BlueprintName = "realityproof"
+               ReferencedContainer = "container:realityproof.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -47,9 +47,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "88818F302FADE6C30060C195"
-            BuildableName = "voxelio_web3.app"
-            BlueprintName = "voxelio_web3"
-            ReferencedContainer = "container:voxelio_web3.xcodeproj">
+            BuildableName = "realityproof.app"
+            BlueprintName = "realityproof"
+            ReferencedContainer = "container:realityproof.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -64,9 +64,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "88818F302FADE6C30060C195"
-            BuildableName = "voxelio_web3.app"
-            BlueprintName = "voxelio_web3"
-            ReferencedContainer = "container:voxelio_web3.xcodeproj">
+            BuildableName = "realityproof.app"
+            BlueprintName = "realityproof"
+            ReferencedContainer = "container:realityproof.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>

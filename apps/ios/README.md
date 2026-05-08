@@ -35,18 +35,18 @@ iOS app  ──▶  Vercel relay  ──▶  Orbitport (cosmic nonce)
 
 | Repo | Purpose |
 |---|---|
-| `voxelio_web3` (this) | iOS capture app |
-| `voxelio_web3_api` | Vercel serverless relay |
-| `voxelio_web3_contracts` | Foundry contracts on Base |
-| `voxelio_web3_viewer` | Next.js verifier with gsplat.js |
+| `realityproof` (this) | iOS capture app |
+| `realityproof_api` | Vercel serverless relay |
+| `realityproof_contracts` | Foundry contracts on Base |
+| `realityproof_viewer` | Next.js verifier with gsplat.js |
 
 ## Local setup
 
 ```bash
-cp voxelio_web3/Resources/Secrets.swift.example voxelio_web3/Resources/Secrets.swift
+cp realityproof/Resources/Secrets.swift.example realityproof/Resources/Secrets.swift
 # edit Secrets.swift — set baseURL to your Vercel relay and sharedKey to
 # the same string you set as IOS_SHARED_SECRET in the backend env
-open voxelio_web3.xcodeproj
+open realityproof.xcodeproj
 ```
 
 Requires iOS 17+, a device with LiDAR for RoomPlan / best-quality Object Capture.

@@ -26,6 +26,6 @@ Package.resolved
 Pods/
 
 # Secrets
-voxelio_web3/Resources/Secrets.swift
+realityproof/Resources/Secrets.swift
 *.p8
 *.mobileprovision
