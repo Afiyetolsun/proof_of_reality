@@ -1,0 +1,28 @@
+{
+  "name": "@proof-of-reality/attestation",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@proof-of-reality/proof-bundle": "workspace:*",
+    "@noble/curves": "^1.6.0",
+    "@noble/hashes": "^1.5.0",
+    "viem": "^2.21.45"
+  },
+  "devDependencies": {
+    "@proof-of-reality/tsconfig": "workspace:*",
+    "typescript": "^5.6.3"
+  }
+}
