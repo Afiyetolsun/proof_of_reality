@@ -67,40 +67,49 @@ mintRouter.post("/", async (req, res, next) => {
       mode: a.mode as 0 | 1 | 2,
     });
 
-    // Predict the ENS subname deterministically (vin-<bundleHash[2:14]>.realityproof.eth)
-    // so iOS can render it on the success card immediately. The actual ENS
-    // publication (NameWrapper.setSubnodeRecord + RealityENSResolver.setProof)
-    // fires async — name is resolvable ~10s after this response.
-    const predictedEnsName = (() => {
+    // Publish the ENS subname BEFORE responding. We can't fire-and-forget
+    // on Vercel — when res.json() returns the function is marked done and
+    // the runtime kills any pending I/O, so the publish txs never get sent.
+    // Awaiting adds ~20s (Eth Sepolia receipt waits) but is the only way
+    // to guarantee the subname actually lands on-chain.
+    let publishResult: Awaited<ReturnType<typeof publishToEns>> = null;
+    try {
+      publishResult = await publishToEns({
+        bundleHash: a.bundleHash as Hex,
+        attestor: recipient,
+        satSig: a.satSig,
+        cosmoSig: a.cosmoSig,
+        sceneCid: a.swarmRef,
+        bundleRefCid: a.bundleRef.startsWith("local:") ? "" : a.bundleRef,
+        capturedAt: a.capturedAt,
+        tokenId: result.tokenId,
+        mode: a.mode as 0 | 1 | 2,
+      });
+      if (publishResult) {
+        console.log(`[mint] ENS published: ${publishResult.subname}`);
+      }
+    } catch (e) {
+      console.warn("[mint] ENS publish error:", (e as Error).message);
+    }
+
+    // Fallback: if ENS publish failed, still return the deterministic predicted
+    // name so iOS has something to display.
+    const fallbackEnsName = (() => {
       if (!env().ENS_PARENT_NAME) return null;
       const slug = a.bundleHash.replace(/^0x/, "").slice(0, 12).toLowerCase();
       return `vin-${slug}.${env().ENS_PARENT_NAME}`;
     })();
 
-    publishToEns({
-      bundleHash: a.bundleHash as Hex,
-      attestor: recipient,
-      satSig: a.satSig,
-      cosmoSig: a.cosmoSig,
-      sceneCid: a.swarmRef,
-      bundleRefCid: a.bundleRef.startsWith("local:") ? "" : a.bundleRef,
-      capturedAt: a.capturedAt,
-      tokenId: result.tokenId,
-      mode: a.mode as 0 | 1 | 2,
-    })
-      .then((r) => {
-        if (r) console.log(`[mint] ENS published: ${r.subname}`);
-      })
-      .catch((e) => console.warn("[mint] ENS publish error:", (e as Error).message));
-
     res.json({
       // iOS-canonical fields
       txHash: result.txHash,
       tokenId: result.tokenId,
-      ensName: predictedEnsName ?? result.ensName,
+      ensName: publishResult?.subname ?? fallbackEnsName ?? result.ensName,
       stub: false,
       // additive
       explorerUrl: `https://sepolia.basescan.org/tx/${result.txHash}`,
+      ensPublished: publishResult !== null,
+      ensTxs: publishResult?.txHashes ?? [],
     });
   } catch (e) {
     if (e instanceof ApiError) {
