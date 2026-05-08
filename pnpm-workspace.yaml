@@ -1,5 +1,6 @@
 packages:
   - "apps/api"
+  - "apps/landing"
   - "apps/viewer"
   - "contracts"
   - "packages/*"

@@ -20,6 +20,7 @@ Three independent witnesses on every scan:
 proof_of_reality/
 ├── apps/
 │   ├── api/            # Vercel serverless backend (TS)
+│   ├── landing/        # Next.js marketing surface (separate Vercel deploy)
 │   ├── viewer/         # Next.js verifier
 │   ├── ios/            # B2C Swift app (Xcode project lives here)
 │   └── camera-agent/   # B2B Python agent + bare-metal Go firmware for the Armory
@@ -31,6 +32,8 @@ proof_of_reality/
 │   ├── verified-swarm-fetch/ # Trustless Swarm gateway client
 │   └── tsconfig/             # Shared TS configs
 ├── docs/               # Architecture, trust model, flows, pitch
+├── PRODUCT.md          # Brand voice + anti-references (read before any UI work)
+├── DESIGN.md           # Color tokens, type scale, motion conventions
 └── tools/              # CLIs, demo scripts
 ```
 
@@ -43,6 +46,7 @@ pnpm abi:sync                   # populate packages/contracts-abi from artifacts
 pnpm --filter @proof-of-reality/contracts test
 pnpm --filter @proof-of-reality/api dev
 pnpm --filter @proof-of-reality/viewer dev
+pnpm --filter @proof-of-reality/landing dev   # http://localhost:3001
 ```
 
 Camera agent has its own toolchain (uv + Python 3.11):

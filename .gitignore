@@ -20,6 +20,9 @@ out
 # private/local-only docs (bounty notes, mentor contacts, sponsor info, etc)
 docs/private/
 
+# local agent harness state (skills, settings, plans)
+.claude/
+
 # python
 __pycache__
 *.pyc

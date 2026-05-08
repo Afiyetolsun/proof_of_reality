@@ -10,6 +10,7 @@
   "scripts": {
     "build": "pnpm -r --parallel run build",
     "dev:api": "pnpm --filter @proof-of-reality/api dev",
+    "dev:landing": "pnpm --filter @proof-of-reality/landing dev",
     "dev:viewer": "pnpm --filter @proof-of-reality/viewer dev",
     "build:contracts": "pnpm --filter @proof-of-reality/contracts compile",
     "test:contracts": "pnpm --filter @proof-of-reality/contracts test",

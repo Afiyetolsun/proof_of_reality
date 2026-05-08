@@ -9,11 +9,13 @@ Two clients (iOS B2C, OAK 4 D B2B) capture physical-world scenes, build a canoni
 ## Where things live
 
 - **TS backend**: `apps/api/` — Vercel serverless, Express, viem
-- **Next.js viewer**: `apps/viewer/`
+- **Next.js viewer**: `apps/viewer/` — verifier UI (`/token/[id]`); will host the future camera viewer
+- **Next.js landing**: `apps/landing/` — marketing surface, separate Vercel deploy. See `apps/landing/README.md`
 - **iOS B2C app**: `apps/ios/` (Xcode project — created by the iOS dev)
 - **B2B camera agent**: `apps/camera-agent/` (Python via uv) + `apps/camera-agent/firmware/armory-signer/` (bare-metal Go via TamaGo)
 - **Contracts**: `contracts/` (Hardhat + viem, Solidity 0.8.27)
 - **Shared TS packages**: `packages/*` — workspace-linked
+- **Brand context**: `PRODUCT.md` and `DESIGN.md` at the root — voice, tokens, anti-references. Load before designing any UI.
 
 ## Load-bearing files
 
