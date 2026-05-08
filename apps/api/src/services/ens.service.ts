@@ -149,37 +149,37 @@ export async function publishToEns(input: EnsPublishInput): Promise<EnsPublishRe
     const parentName = e.ENS_PARENT_NAME ?? "realityproof.eth";
     const parentNode = namehash(parentName);
 
-    const txHashes: Hex[] = [];
+    // Both txs are sent back-to-back without awaiting their receipts.
+    // Reason: each Eth Sepolia receipt takes 12-24s and Vercel kills the
+    // serverless function around 60s total — including the Base Sepolia
+    // mint receipt earlier in the request, two ENS receipt waits would
+    // tip us over and the second tx would get cut off.
+    //
+    // We set explicit nonces because viem's auto-nonce reads from the RPC
+    // each call; if we send tx 1 and immediately call writeContract again
+    // before tx 1 lands, the second call might pick the same nonce.
 
-    // 1. Register the subnode + point it at our resolver via ENS Registry.
-    //    For unwrapped names, the parent's Registry.owner can call this
-    //    directly. label is the labelhash (keccak256 of the label string),
-    //    not the string itself — that's the Registry's calling convention.
+    const baseNonce = await pc.getTransactionCount({
+      address: privateKeyToAccount(env().MINTER_PRIVATE_KEY as Hex).address,
+    });
+
     const labelHash = keccak256(toBytes(label));
-    try {
-      const subnodeTx = await wallet.writeContract({
-        address: ENS_REGISTRY_SEPOLIA,
-        abi: ENS_REGISTRY_ABI,
-        functionName: "setSubnodeRecord",
-        args: [
-          parentNode,
-          labelHash,
-          input.attestor,                              // owner of the subname
-          e.ENS_RESOLVER_ADDRESS as Address,           // our resolver
-          0n,                                          // ttl
-        ],
-      } as never);
-      txHashes.push(subnodeTx);
-      const r = await pc.waitForTransactionReceipt({ hash: subnodeTx });
-      if (r.status !== "success") {
-        console.warn(`[ens] setSubnodeRecord tx reverted: ${subnodeTx}`);
-      }
-    } catch (e) {
-      console.warn("[ens] setSubnodeRecord failed:", (e as Error).message);
-    }
 
-    // 2. Publish proof records via our resolver.
-    const proofTx = await wallet.writeContract({
+    const subnodeTx = (await wallet.writeContract({
+      address: ENS_REGISTRY_SEPOLIA,
+      abi: ENS_REGISTRY_ABI,
+      functionName: "setSubnodeRecord",
+      args: [
+        parentNode,
+        labelHash,
+        input.attestor,
+        e.ENS_RESOLVER_ADDRESS as Address,
+        0n,
+      ],
+      nonce: baseNonce,
+    } as never)) as Hex;
+
+    const proofTx = (await wallet.writeContract({
       address: e.ENS_RESOLVER_ADDRESS as Address,
       abi: RealityENSResolverAbi,
       functionName: "setProof",
@@ -197,10 +197,10 @@ export async function publishToEns(input: EnsPublishInput): Promise<EnsPublishRe
           mode: input.mode,
         },
       ],
-    } as never);
-    txHashes.push(proofTx);
+      nonce: baseNonce + 1,
+    } as never)) as Hex;
 
-    return { subname: full, node, txHashes };
+    return { subname: full, node, txHashes: [subnodeTx, proofTx] };
   } catch (err) {
     console.warn("[ens] publish failed:", (err as Error).message);
     return null;
