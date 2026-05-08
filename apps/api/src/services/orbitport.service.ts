@@ -61,10 +61,18 @@ export async function cosignBundle(bundleHashHex: `0x${string}`): Promise<`0x${s
     console.warn("[orbitport] KMS_COSIGNER_KEY_ID not set; skipping cosign");
     return null;
   }
+  // KMS DIGEST mode requires the message to be exactly 32 raw bytes — pass as
+  // Uint8Array (the SDK base64-encodes on the wire). Passing the 0x-prefixed
+  // hex string would be sent as 66 ASCII bytes and rejected.
+  const clean = bundleHashHex.startsWith("0x") ? bundleHashHex.slice(2) : bundleHashHex;
+  const messageBytes = new Uint8Array(clean.length / 2);
+  for (let i = 0; i < messageBytes.length; i++) {
+    messageBytes[i] = parseInt(clean.slice(i * 2, i * 2 + 2), 16);
+  }
   try {
     const r = await sdk().kms.sign({
       keyId,
-      message: bundleHashHex,
+      message: messageBytes,
       // Our KMS key is created in the ETHEREUM scheme (ECC_SECG_P256K1) so we
       // can pin its uncompressed pubkey in the viewer and verify with noble's
       // secp256k1 directly — no GetPublicKey RPC needed (Orbitport doesn't
