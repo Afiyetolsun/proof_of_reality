@@ -1,0 +1,28 @@
+{
+  "name": "@proof-of-reality/verified-swarm-fetch",
+  "version": "0.1.0",
+  "description": "Trustless Swarm fetch — verifies content addressing client-side. Like helia-verified-fetch, for Swarm.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test --experimental-strip-types src/**/*.test.ts"
+  },
+  "dependencies": {
+    "@noble/hashes": "^1.5.0",
+    "viem": "^2.21.45"
+  },
+  "devDependencies": {
+    "@proof-of-reality/tsconfig": "workspace:*",
+    "typescript": "^5.6.3"
+  }
+}
