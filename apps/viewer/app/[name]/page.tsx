@@ -92,7 +92,11 @@ export default async function NamePage({ params }: PageProps) {
         </header>
 
         {sceneUrl && (
-          <ProofScene url={sceneUrl} attestor={record.attestor ?? undefined} />
+          <ProofScene
+            url={sceneUrl}
+            attestor={record.attestor ?? undefined}
+            mode={record.mode ?? undefined}
+          />
         )}
 
         <section className="card">

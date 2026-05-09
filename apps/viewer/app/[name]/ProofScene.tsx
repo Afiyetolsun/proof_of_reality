@@ -1,11 +1,18 @@
 "use client";
 
 import Script from "next/script";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 interface Props {
   url: string;
   attestor?: string;
+  /**
+   * Capture mode from the proof bundle. Drives <model-viewer> lighting:
+   * room scans (white walls, no textures) need flat IBL with no shadows
+   * or they look like a single solid box; object scans look best with
+   * a strong shadow + slight exposure cut to ground them.
+   */
+  mode?: string;
 }
 
 type SceneFormat = "glb" | "usdz" | "unknown";
@@ -26,7 +33,7 @@ type SceneFormat = "glb" | "usdz" | "unknown";
  * mismatch from <model-viewer> writing ar-status="not-presenting" on
  * mount.
  */
-export function ProofScene({ url, attestor }: Props) {
+export function ProofScene({ url, attestor, mode }: Props) {
   const [mounted, setMounted] = useState(false);
   const [format, setFormat] = useState<SceneFormat>("unknown");
   const [error, setError] = useState<string | null>(null);
@@ -97,10 +104,75 @@ export function ProofScene({ url, attestor }: Props) {
     return <UsdzCard url={url} attestor={attestor} />;
   }
 
-  return <GlbCard url={url} attestor={attestor} />;
+  return <GlbCard url={url} attestor={attestor} mode={mode} />;
 }
 
-function GlbCard({ url, attestor }: { url: string; attestor?: string }) {
+function GlbCard({
+  url,
+  attestor,
+  mode,
+}: {
+  url: string;
+  attestor?: string;
+  mode?: string;
+}) {
+  const isRoom = mode === "roomPlan" || mode === "room";
+  const ref = useRef<HTMLElement | null>(null);
+
+  // Two material tweaks applied on GLB load:
+  //
+  // 1. Double-sided rendering. RoomPlan exports walls as single-sided
+  //    planes facing inward; without this, the auto-framed camera
+  //    sitting outside the bounding box sees only backfaces of every
+  //    wall and the room collapses to a floor plane.
+  //
+  // 2. Polygon offset. RoomPlan's USD also exports overlapping coplanar
+  //    geometry (e.g. wall+ceiling sharing the same edge plane), and
+  //    Blender's USD→GLB doesn't dedupe it. The two surfaces fight for
+  //    pixels at the corner, producing the white-flickering pixels
+  //    you're seeing. polygonOffset nudges depth values by a slope-
+  //    proportional amount, breaking the depth tie cleanly. We reach
+  //    into model-viewer's underlying three.js Material via its
+  //    internal symbol — best effort, fails silently if the API moves.
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    let cancelled = false;
+    const onLoad = () => {
+      if (cancelled) return;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const mv = el as any;
+      try {
+        const mats = mv.model?.materials ?? [];
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        for (const m of mats) {
+          m.setDoubleSided?.(true);
+          // Reach the underlying three.js Material to set polygonOffset.
+          // model-viewer stashes it under Symbol.for('material') in
+          // recent versions; older versions used a different name.
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const tm: any =
+            m[Symbol.for("material")] ??
+            m.threeMaterial ??
+            m._material;
+          if (tm) {
+            tm.polygonOffset = true;
+            tm.polygonOffsetFactor = 1;
+            tm.polygonOffsetUnits = 1;
+            tm.needsUpdate = true;
+          }
+        }
+      } catch (e) {
+        console.warn("[scene] post-load material tweak failed", e);
+      }
+    };
+    el.addEventListener("load", onLoad);
+    return () => {
+      cancelled = true;
+      el.removeEventListener("load", onLoad);
+    };
+  }, [url]);
+
   return (
     <section className="scene-card">
       {/* Self-hosted model-viewer (instead of the googleapis CDN) so
@@ -114,15 +186,29 @@ function GlbCard({ url, attestor }: { url: string; attestor?: string }) {
       {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
       <model-viewer
         {...({
+          ref,
           src: url,
           alt: "Captured 3D scene",
           "camera-controls": "",
           "auto-rotate": "",
+          "auto-rotate-delay": "1500",
+          "rotation-per-second": "20deg",
+          // IBL via a built-in neutral HDRI — without it, untextured
+          // PBR materials (every wall in a RoomPlan capture) read as a
+          // single flat shade and you can't see geometry edges.
+          "environment-image": "neutral",
+          "tone-mapping": "aces",
+          exposure: "1.0",
+          "shadow-intensity": "1",
+          "shadow-softness": isRoom ? "0.5" : "0.6",
+          // Lift the camera for room scans so we look down into the
+          // floor plan; default for objects so model-viewer's
+          // auto-framing fits them centered.
+          ...(isRoom ? { "camera-orbit": "25deg 65deg auto" } : {}),
+          "interaction-prompt": "auto",
           ar: "",
           "ar-modes": "scene-viewer webxr quick-look",
           "ios-src": url,
-          "shadow-intensity": "1",
-          exposure: "0.9",
           loading: "eager",
           style: {
             width: "100%",

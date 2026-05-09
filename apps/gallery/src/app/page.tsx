@@ -5,8 +5,8 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Card } from "@/components/Card";
 import { Filters, parseFilters, type FilterState } from "@/components/Filters";
-import { ensAppParentUrl, ensParentName } from "@/lib/viewer-link";
-import { Eyebrow } from "@/components/Eyebrow";
+import { ensAppParentUrl } from "@/lib/viewer-link";
+import { LandingSearch } from "@/components/LandingSearch";
 
 interface PageProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -20,24 +20,27 @@ export default async function GalleryPage({ searchParams }: PageProps) {
     <>
       <Header />
       <main id="content" className="pb-12">
-        <section className="container-page pb-8 pt-6 md:pt-10">
-          <Eyebrow>Index</Eyebrow>
-          <h1 className="mt-3 text-display-l text-[--color-ink]">
-            Every Reality NFT, in one wall.
+        {/* Hero: same monospace + diamond-icon vibe as the per-proof page,
+            centered and tight. Short tagline mirrors the per-proof page
+            ("Cryptographic capture of physical reality. Verified by four
+            independent witnesses.") so visitors hitting the index get the
+            same one-line claim before they click into a single proof. */}
+        <section className="container-page pb-10 pt-12 text-center md:pt-20">
+          <div
+            aria-hidden
+            className="mx-auto text-[40px] leading-none text-[--color-signal]"
+            style={{ filter: "drop-shadow(0 0 18px oklch(0.74 0.14 58 / 0.40))" }}
+          >
+            ◆
+          </div>
+          <h1 className="mx-auto mt-5 max-w-[20ch] text-display-m font-mono text-[--color-ink]">
+            proof of reality
           </h1>
-          <p className="mt-5 max-w-[60ch] text-body text-[--color-ink-mute]">
-            Each card is a physical-world scan minted on Base Sepolia and
-            published as a subname under{" "}
-            <a
-              href={ensAppParentUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="text-mono text-[--color-ink] underline decoration-transparent underline-offset-4 hover:decoration-[--color-signal]"
-            >
-              {ensParentName}
-            </a>
-            . Click through to verify five independent witnesses on each.
+          <p className="mx-auto mt-4 max-w-[52ch] text-body text-[--color-ink-mute]">
+            Cryptographic captures of the physical world. Each scan signed by
+            four independent witnesses.
           </p>
+          <LandingSearch />
         </section>
 
         <Suspense fallback={<GalleryFallback filters={filters} />}>

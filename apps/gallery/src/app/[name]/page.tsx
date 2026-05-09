@@ -7,14 +7,16 @@
  * Resolves the ENS subname on Eth Sepolia, fetches the on-chain proof
  * struct on Base Sepolia by tokenId, fetches the canonical bundle from
  * Swarm, runs the five-witness verification chain, and renders the 3D
- * scene inline (GLB via <model-viewer>, USDZ via three-usdz-loader +
- * Pixar USD WASM).
+ * scene inline via <model-viewer>. USDZ contenthashes are rewritten
+ * to their cached GLB equivalents by lib/converter.ts (server-side)
+ * before this page renders.
  *
  * Anyone with the URL can verify end-to-end — no app, no wallet.
  */
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { resolveEnsName, contentUrl, directContentUrl, normalizeName } from "@/lib/ens.js";
+import { maybeConvertScene } from "@/lib/converter.js";
 import { getProof, ChainConfigMissingError } from "@/lib/chain/index.js";
 import { runVerification } from "@/lib/verify/index.js";
 import { Header } from "@/components/Header";
@@ -40,7 +42,11 @@ export default async function NamePage({ params }: PageProps) {
     return <ErrorView kind={res.error.code} message={res.error.message} name={name} />;
   }
 
-  const record = res.record;
+  // If the contenthash is a USDZ on Swarm, ask the converter for the
+  // GLB version (cached per ref on the VPS) so <model-viewer> can
+  // render it in-canvas. Silent no-op when the converter is offline,
+  // the scene is already GLB, or the format can't be detected.
+  const record = await maybeConvertScene(res.record);
 
   let onchain: Awaited<ReturnType<typeof getProof>> | null = null;
   let checks: Awaited<ReturnType<typeof runVerification>> = [];
@@ -90,7 +96,11 @@ export default async function NamePage({ params }: PageProps) {
 
         {sceneUrl && (
           <section className="mt-10">
-            <ProofScene url={sceneUrl} attestor={record.attestor ?? undefined} />
+            <ProofScene
+              url={sceneUrl}
+              attestor={record.attestor ?? undefined}
+              mode={record.mode ?? undefined}
+            />
           </section>
         )}
 
