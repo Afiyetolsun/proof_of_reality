@@ -3670,6 +3670,11 @@ packages:
     resolution: {integrity: sha512-3ZBiG7JvP3wbDzA9iNY5zJQcHL4jn/0BWtXIkagfz7QgOL/LqjCEOBQuJNZfu0XYnv5JhKh+cDxCPM4ILrqruA==}
     engines: {node: '>=6.0.0'}
 
+  three-usdz-loader@1.0.9:
+    resolution: {integrity: sha512-UOP2XHHT4dUIZInhVPQieVXFyxpSE1ApMEJZVLDdo5j5flp1KSGlY1uGE3To7KhDIks+kAOmsCnNDjQ3RvjMFA==}
+    peerDependencies:
+      three: ^0.166.0
+
   three@0.165.0:
     resolution: {integrity: sha512-cc96IlVYGydeceu0e5xq70H8/yoVT/tXBxV/W8A/U6uOq7DXc4/s1Mkmnu6SqoYGhSRWWYFOhVwvq6V0VtbplA==}
 
@@ -7704,6 +7709,10 @@ snapshots:
       http-response-object: 3.0.2
       promise: 8.3.0
       qs: 6.15.1
+
+  three-usdz-loader@1.0.9(three@0.166.1):
+    dependencies:
+      three: 0.166.1
 
   three@0.165.0: {}
 
