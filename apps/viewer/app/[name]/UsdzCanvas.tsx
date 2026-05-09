@@ -24,6 +24,7 @@ interface Props {
 export function UsdzCanvas({ url }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [stage, setStage] = useState<string>("starting");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
@@ -85,27 +86,25 @@ export function UsdzCanvas({ url }: Props) {
 
     (async () => {
       try {
-        // Sanity-check that cross-origin isolation actually engaged.
-        // Without it, SharedArrayBuffer is undefined and the WASM
-        // module silently refuses to initialize.
         const isolated = (globalThis as { crossOriginIsolated?: boolean }).crossOriginIsolated;
         const sab = typeof SharedArrayBuffer !== "undefined";
+        setStage(`isolated=${isolated} SAB=${sab}`);
         console.log("[usdz] crossOriginIsolated =", isolated, "SAB =", sab);
         if (!isolated || !sab) {
           throw new Error(
-            "cross-origin isolation didn't engage — page is missing COOP/COEP headers (SAB unavailable)",
+            "cross-origin isolation didn't engage. Hard-refresh (Cmd+Shift+R) the page or open in a private window. If still not isolated, the COOP/COEP middleware isn't running.",
           );
         }
 
-        console.log("[usdz] fetching scene…");
+        setStage("fetching scene from /api/scene…");
         const res = await fetch(url);
-        if (!res.ok) throw new Error(`fetch ${res.status}`);
+        if (!res.ok) throw new Error(`/api/scene returned ${res.status}`);
         const blob = await res.blob();
-        console.log("[usdz] fetched", blob.size, "bytes; calling loader.loadFile…");
+        setStage(`fetched ${(blob.size / 1024).toFixed(0)} KB; loading Pixar USD WASM…`);
         if (disposed) return;
         const file = new File([blob], "scene.usdz", { type: "model/vnd.usdz+zip" });
         await loader.loadFile(file, groupHolder);
-        console.log("[usdz] loadFile resolved; framing camera");
+        setStage("parsed; building three.js scene…");
         if (disposed) return;
         frameCamera(groupHolder, camera, controls);
         setStatus("ready");
@@ -173,8 +172,20 @@ export function UsdzCanvas({ url }: Props) {
     >
       {status === "loading" && (
         <div style={overlayStyle}>
-          <div style={{ fontSize: 14, color: "var(--text-muted)" }}>
-            Loading 3D scene…
+          <div style={{ textAlign: "center" }}>
+            <div style={{ fontSize: 14, color: "var(--text-muted)" }}>
+              Loading 3D scene…
+            </div>
+            <div
+              style={{
+                fontSize: 11,
+                color: "var(--text-tertiary)",
+                marginTop: 6,
+                fontFamily: "ui-monospace, Menlo, monospace",
+              }}
+            >
+              {stage}
+            </div>
           </div>
         </div>
       )}
