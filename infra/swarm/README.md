@@ -69,18 +69,16 @@ Restart `pnpm dev:api` and test with `pnpm --filter @proof-of-reality/api exec t
 
 ## Setup — VPS / production
 
-Same `docker-compose.yml`. Two changes for prod reliability:
+Full step-by-step in **[`DEPLOY.md`](./DEPLOY.md)** — Hetzner CX22 example,
+~25 min from "I have nothing" to "Vercel uploads to my Bee node".
 
-1. In `.env`, set `BEE_NAT_ADDR=<public-ip>:1634` so other Bee nodes can
-   dial the P2P port. Also open port 1634 in the VPS firewall.
-2. Set `BEE_BLOCKCHAIN_RPC_ENDPOINT` to a private Gnosis RPC (Alchemy,
-   dRPC, your own node) — the public default rate-limits.
-3. In `apps/api/.env` (Vercel), set `SWARM_BEE_URL=http://<vps-ip>:1633`
-   instead of `localhost`. Lock the firewall to allow only Vercel
-   egress IPs (or front it with a tiny auth proxy).
+Summary: same `docker-compose.yml`, set `BEE_NAT_ADDR=<public-ip>:1634`
+in `.env`, open ports 1633/1634, fund the new wallet, buy a stamp,
+point `SWARM_BEE_URL=http://<vps-ip>:1633` at Vercel. Cost ~€5/mo.
 
 Funded once, the same wallet+stamp keep working until the stamp's TTL
-expires. Re-run `./bee-setup.sh stamp` to mint a new one before then.
+expires. Re-run `./bee-setup.sh stamp` to mint a new one before then —
+or run `./bee-setup.sh watch` to get a Discord/Slack alert before it does.
 
 ## Useful commands
 
