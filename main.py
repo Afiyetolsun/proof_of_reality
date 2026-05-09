@@ -265,6 +265,21 @@ def build_pipeline(args, mgr, stop_event):
         stereo.setSubpixel(True)
         stereo.setLeftRightCheck(True)
 
+        # Depth post-processing (runs in the StereoDepth node before
+        # ImageAlign, so the aligned depth we read is already filtered):
+        #   * temporal — averages depth across frames; massive SNR boost
+        #     on the static parts of a room scan, the main source of cloud
+        #     "fizz" on flat walls.
+        #   * speckle  — drops small islands of disparity that don't agree
+        #     with their neighbours (sensor noise / mismatches).
+        #   * threshold — clamps depth to (depth_min_mm, depth_max_mm) so
+        #     wildly-out-of-range pixels never reach the TSDF.
+        pp = stereo.initialConfig.postProcessing
+        pp.temporalFilter.enable = True
+        pp.speckleFilter.enable = True
+        pp.thresholdFilter.minRange = 200  # mm
+        pp.thresholdFilter.maxRange = int(args.depth_max * 1000)
+
         if platform == dai.Platform.RVC4:
             align = pipeline.create(dai.node.ImageAlign)
             stereo.depth.link(align.input)
