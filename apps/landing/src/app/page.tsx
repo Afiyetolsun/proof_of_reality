@@ -47,8 +47,8 @@ function Hero() {
           proof. Not generatable by AI, not pre-recordable, not forgeable on the ground.
         </p>
         <div className="mt-10 flex flex-wrap items-center gap-x-8 gap-y-4">
-          <CTAButton href={viewerHome} external>
-            Open the verifier
+          <CTAButton href={viewerHome} size="lg" external>
+            Open the app
           </CTAButton>
           <CTAButton href={architectureUrl} variant="ghost" external>
             Architecture
@@ -193,7 +193,7 @@ function Demo() {
 
           <div className="mt-8">
             <CTAButton href={viewerHome} external>
-              Verify it yourself
+              Open the app
             </CTAButton>
           </div>
         </div>
@@ -306,7 +306,7 @@ function BuildWithUs() {
         </div>
         <div className="md:col-span-8">
           <p className="text-display-m text-[--color-ink]">
-            We are at ETHPrague. The verifier is open at{" "}
+            We are at ETHPrague. The app is open at{" "}
             <a
               href={viewerHome}
               target="_blank"
@@ -327,8 +327,8 @@ function BuildWithUs() {
             . Open the proof.
           </p>
           <div className="mt-8 flex flex-wrap items-center gap-x-8 gap-y-4">
-            <CTAButton href={viewerHome} external>
-              Open the verifier
+            <CTAButton href={viewerHome} size="lg" external>
+              Open the app
             </CTAButton>
             <CTAButton href={githubUrl} variant="ghost" external>
               Read the source

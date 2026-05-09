@@ -160,15 +160,15 @@ function Glyph({ kind, animate, delay }: { kind: Witness["glyph"]; animate: bool
       <svg viewBox="0 0 100 100" className="h-full w-full" aria-hidden>
         {Array.from({ length: 7 }).map((_, i) => {
           const a = (i / 7) * Math.PI * 2;
-          const x = 50 + Math.cos(a) * 24;
-          const y = 50 + Math.sin(a) * 24;
+          const x = Math.round((50 + Math.cos(a) * 24) * 100) / 100;
+          const y = Math.round((50 + Math.sin(a) * 24) * 100) / 100;
           return <circle key={i} cx={x} cy={y} r="3" fill="oklch(0.30 0.014 250)" />;
         })}
         <circle cx="50" cy="50" r="6" fill="oklch(0.74 0.14 58)" />
         {Array.from({ length: 7 }).map((_, i) => {
           const a = (i / 7) * Math.PI * 2;
-          const x = 50 + Math.cos(a) * 24;
-          const y = 50 + Math.sin(a) * 24;
+          const x = Math.round((50 + Math.cos(a) * 24) * 100) / 100;
+          const y = Math.round((50 + Math.sin(a) * 24) * 100) / 100;
           return (
             <line
               key={i}

@@ -4,6 +4,11 @@ import { useEffect, useRef, useState } from "react";
 
 type NonceData = { nonce: string; src?: string | null };
 
+// Round trig-derived coordinates to 2 decimals so SVG attrs are byte-identical
+// across Node SSR and browser hydration (V8 Math.sin/cos can diverge on the
+// last digit between engines).
+const round = (n: number) => Math.round(n * 100) / 100;
+
 export function HeroOrbital() {
   const [nonce, setNonce] = useState<string>("0a4c2ea21557418bbc1d57120142ad83e8fa6e030ad35125fe225b97929d2526");
   const wrapRef = useRef<HTMLDivElement | null>(null);
@@ -106,8 +111,8 @@ export function HeroOrbital() {
         {Array.from({ length: 26 }).map((_, i) => {
           const a = (i / 26) * Math.PI * 2;
           const r = 70 + ((i * 13) % 110);
-          const x = 200 + Math.cos(a) * r;
-          const y = 200 + Math.sin(a) * r;
+          const x = round(200 + Math.cos(a) * r);
+          const y = round(200 + Math.sin(a) * r);
           const op = 0.18 + ((i * 7) % 30) / 100;
           return (
             <circle
@@ -141,8 +146,8 @@ export function HeroOrbital() {
             const t = i / 80;
             const a = t * Math.PI * 2 * 3;
             const rr = 12 + (i % 7) * 4;
-            const cx = 200 + Math.cos(a) * rr * (1 - t * 0.5);
-            const cy = 195 + Math.sin(a) * rr * 0.55 * (1 - t * 0.4);
+            const cx = round(200 + Math.cos(a) * rr * (1 - t * 0.5));
+            const cy = round(195 + Math.sin(a) * rr * 0.55 * (1 - t * 0.4));
             return (
               <circle
                 key={i}

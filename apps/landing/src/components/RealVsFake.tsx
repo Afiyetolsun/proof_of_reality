@@ -2,42 +2,78 @@
 
 import { useState } from "react";
 import { Mono } from "./Mono";
+import { MeshViewer } from "./MeshViewer";
 
 type Mode = "real" | "fake";
 
+const REAL_GLB = "/mesh/penguin-real.glb";
+const FAKE_GLB = "/mesh/penguin-fake.glb";
+
 export function RealVsFake() {
   const [mode, setMode] = useState<Mode>("real");
+  // Lazy-mount the fake viewer only after first toggle, since the asset is ~40 MB.
+  const [fakeMounted, setFakeMounted] = useState(false);
   const real = mode === "real";
+
+  const goFake = () => {
+    setFakeMounted(true);
+    setMode("fake");
+  };
 
   return (
     <div className="grid grid-cols-1 gap-8 md:grid-cols-12 md:gap-10">
       <div className="md:col-span-7">
         <div className="relative aspect-[5/4] w-full overflow-hidden border border-[--color-rule] bg-[--color-surface-raised]">
-          {/* Two layers, one real and one fake, cross-faded */}
-          <RealLayer visible={real} />
-          <FakeLayer visible={!real} />
+          <div
+            className="absolute inset-0 transition-opacity duration-500"
+            style={{ opacity: real ? 1 : 0 }}
+            aria-hidden={!real}
+          >
+            <MeshViewer
+              src={REAL_GLB}
+              active={real}
+              ariaLabel="Real penguin: a captured 3D scan"
+              className="h-full w-full"
+            />
+          </div>
+          <div
+            className="absolute inset-0 transition-opacity duration-500"
+            style={{ opacity: real ? 0 : 1 }}
+            aria-hidden={real}
+          >
+            {fakeMounted ? (
+              <MeshViewer
+                src={FAKE_GLB}
+                active={!real}
+                ariaLabel="AI-generated penguin: a synthetic 3D model"
+                className="h-full w-full"
+              />
+            ) : null}
+          </div>
 
-          {/* corner brackets */}
           <Corners color={real ? "signal" : "warn"} />
 
-          {/* mode toggle */}
           <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
             <div className="text-mono-s text-[--color-ink-mute]">
-              {real ? "REAL · capture-001.ply" : "FAKE · gen-stable3d-77.ply"}
+              {real ? "REAL · scan-penguin-001.glb" : "FAKE · gen-stable3d-77.glb"}
             </div>
             <div className="flex border border-[--color-rule]">
               <button
                 onClick={() => setMode("real")}
                 className={`px-3 py-1 text-mono-s transition-colors ${
-                  real ? "bg-[--color-signal] text-[--color-surface-deep]" : "text-[--color-ink-mute] hover:text-[--color-ink]"
+                  real
+                    ? "bg-[--color-signal] text-[--color-surface-deep]"
+                    : "text-[--color-ink-mute] hover:text-[--color-ink]"
                 }`}
               >
                 REAL
               </button>
               <button
-                onClick={() => setMode("fake")}
+                onClick={goFake}
                 className={`px-3 py-1 text-mono-s transition-colors ${
-                  !real ? "bg-[--color-warn] text-[--color-surface-deep]" : "text-[--color-ink-mute] hover:text-[--color-ink]"
+                  !real
+                    ? "bg-[--color-warn] text-[--color-surface-deep]"
+                    : "text-[--color-ink-mute] hover:text-[--color-ink]"
                 }`}
               >
                 AI-GENERATED
@@ -113,86 +149,6 @@ function Corners({ color }: { color: "signal" | "warn" }) {
           <line x1={x} y1={y} x2={x} y2={y + dy * 6} />
         </g>
       ))}
-    </svg>
-  );
-}
-
-function RealLayer({ visible }: { visible: boolean }) {
-  return (
-    <svg
-      viewBox="0 0 500 400"
-      className="absolute inset-0 h-full w-full transition-opacity duration-300"
-      style={{ opacity: visible ? 1 : 0 }}
-      aria-hidden
-    >
-      {/* gridded ground */}
-      <defs>
-        <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
-          <path d="M 20 0 L 0 0 0 20" fill="none" stroke="oklch(0.30 0.014 250)" strokeWidth="0.3" />
-        </pattern>
-      </defs>
-      <rect width="500" height="400" fill="url(#grid)" opacity="0.5" />
-
-      {/* subject volume */}
-      <ellipse cx="250" cy="290" rx="100" ry="14" fill="oklch(0.16 0.012 250)" opacity="0.6" />
-      {/* dense splat-dot cluster, varied density (real) */}
-      {Array.from({ length: 220 }).map((_, i) => {
-        const a = ((i * 17) % 360) * (Math.PI / 180);
-        const r = 12 + ((i * 31) % 95);
-        const cx = 250 + Math.cos(a) * r;
-        const cy = 200 + Math.sin(a) * r * 0.55;
-        return (
-          <circle
-            key={i}
-            cx={cx}
-            cy={cy}
-            r={i % 17 === 0 ? 1.6 : 0.8}
-            fill={i % 23 === 0 ? "oklch(0.74 0.14 58)" : "oklch(0.97 0.008 85)"}
-            opacity={0.4 + ((i * 7) % 50) / 100}
-          />
-        );
-      })}
-      {/* nonce-QR billboard within the scene */}
-      <g transform="translate(355 90)">
-        <rect width="60" height="60" fill="oklch(0.97 0.008 85)" />
-        {Array.from({ length: 64 }).map((_, i) => {
-          const x = (i % 8) * 7 + 2;
-          const y = Math.floor(i / 8) * 7 + 2;
-          const filled = (i * 31) % 5 < 2;
-          return filled ? <rect key={i} x={x} y={y} width="6" height="6" fill="oklch(0.16 0.012 250)" /> : null;
-        })}
-        <text x="0" y="-6" className="text-mono-s" fill="oklch(0.74 0.14 58)" fontSize="7">
-          BOUND NONCE · IN SCENE
-        </text>
-      </g>
-    </svg>
-  );
-}
-
-function FakeLayer({ visible }: { visible: boolean }) {
-  return (
-    <svg
-      viewBox="0 0 500 400"
-      className="absolute inset-0 h-full w-full transition-opacity duration-300"
-      style={{ opacity: visible ? 1 : 0 }}
-      aria-hidden
-    >
-      <rect width="500" height="400" fill="oklch(0.21 0.014 250)" />
-      {/* uniform, suspiciously perfect distribution (fake) */}
-      {Array.from({ length: 220 }).map((_, i) => {
-        const a = ((i * 360) / 220) * (Math.PI / 180);
-        const r = 50 + (i % 4) * 11;
-        const cx = 250 + Math.cos(a) * r;
-        const cy = 200 + Math.sin(a) * r * 0.55;
-        return <circle key={i} cx={cx} cy={cy} r={1} fill="oklch(0.97 0.008 85)" opacity="0.65" />;
-      })}
-      {/* missing QR, missing nonce */}
-      <g transform="translate(355 90)">
-        <rect width="60" height="60" fill="none" stroke="oklch(0.62 0.16 28)" strokeDasharray="3 3" strokeWidth="1" />
-        <text x="30" y="36" className="text-mono-s" fill="oklch(0.62 0.16 28)" fontSize="7" textAnchor="middle">
-          NO BOUND NONCE
-        </text>
-      </g>
     </svg>
   );
 }
