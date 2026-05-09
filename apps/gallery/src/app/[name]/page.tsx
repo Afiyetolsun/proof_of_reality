@@ -78,19 +78,10 @@ export default async function NamePage({ params }: PageProps) {
       className="mx-auto flex max-w-[880px] flex-col gap-6 px-5 pb-20 pt-8"
     >
       <header className="px-2 pb-2 pt-6 text-center">
-        <div className="mb-3 inline-flex items-center gap-3">
-          <span
-            aria-hidden
-            className="text-[28px] leading-none text-[--color-signal]"
-            style={{ filter: "drop-shadow(0 0 12px oklch(0.74 0.14 58 / 0.40))" }}
-          >
-            ◆
-          </span>
-          <h1 className="m-0 break-all font-mono text-display-m text-[--color-ink]">
-            {record.name}
-          </h1>
-        </div>
-        <p className="mx-auto mb-5 mt-2 max-w-[540px] text-body text-[--color-ink-mute]">
+        <h1 className="m-0 break-all font-mono text-display-m text-[--color-ink]">
+          {record.name}
+        </h1>
+        <p className="mx-auto mb-5 mt-3 max-w-[540px] text-body text-[--color-ink]">
           Cryptographic capture of physical reality. Verified by independent
           witnesses.
         </p>
@@ -106,23 +97,23 @@ export default async function NamePage({ params }: PageProps) {
       )}
 
       <section className="rounded-[20px] border border-[--color-rule] bg-[--color-surface-raised] px-6 py-5">
-        <h2 className="m-0 mb-3.5 text-eyebrow font-mono uppercase tracking-[0.08em] text-[--color-ink-mute]">
+        <h2 className="m-0 mb-3.5 text-eyebrow font-mono uppercase tracking-[0.08em] text-[--color-signal]">
           Verification
         </h2>
         {checks.length === 0 && record.tokenId === null && (
-          <p className="text-body-s text-[--color-ink-mute]">
+          <p className="text-body-s text-[--color-ink]">
             ENS records are still propagating (newly-minted proofs take ~25 s
             for the on-chain side to finalize). Refresh in a moment.
           </p>
         )}
         {checks.length === 0 && record.tokenId !== null && chainConfigMissing && (
-          <p className="text-body-s text-[--color-ink-mute]">
+          <p className="text-body-s text-[--color-ink]">
             On-chain witness verification is offline (deployment env vars
             unset). The ENS records below still prove the mint happened.
           </p>
         )}
         {checks.length === 0 && record.tokenId !== null && !chainConfigMissing && (
-          <p className="text-body-s text-[--color-ink-mute]">
+          <p className="text-body-s text-[--color-ink]">
             Couldn&apos;t fetch on-chain proof — see browser console.
           </p>
         )}
@@ -130,7 +121,7 @@ export default async function NamePage({ params }: PageProps) {
       </section>
 
       <section className="rounded-[20px] border border-[--color-rule] bg-[--color-surface-raised] px-6 py-5">
-        <h2 className="m-0 mb-3.5 text-eyebrow font-mono uppercase tracking-[0.08em] text-[--color-ink-mute]">
+        <h2 className="m-0 mb-3.5 text-eyebrow font-mono uppercase tracking-[0.08em] text-[--color-signal]">
           Proof bundle
         </h2>
         <dl className="grid grid-cols-[minmax(120px,auto)_1fr] gap-x-5 gap-y-3 text-body-s">
@@ -236,7 +227,7 @@ export default async function NamePage({ params }: PageProps) {
 function KV({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <>
-      <dt className="text-[--color-ink-mute]">{label}</dt>
+      <dt className="font-medium text-[--color-signal]">{label}</dt>
       <dd className="m-0 min-w-0 break-words text-[--color-ink]">{children}</dd>
     </>
   );

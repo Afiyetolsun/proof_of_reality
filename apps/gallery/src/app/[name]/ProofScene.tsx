@@ -276,13 +276,13 @@ function UsdzCard({ url, attestor }: { url: string; attestor?: string }) {
 function Caption({ attestor }: { attestor?: string }) {
   if (!attestor) return null;
   return (
-    <p className="text-mono-s text-[--color-ink-mute]">
-      Captured by{" "}
+    <p className="px-2 pt-2 text-mono-s text-[--color-ink]">
+      <span className="text-[--color-signal]">Captured by</span>{" "}
       <a
         href={`https://sepolia.basescan.org/address/${attestor}`}
         target="_blank"
         rel="noreferrer"
-        className="text-mono text-[--color-ink] underline decoration-transparent underline-offset-4 hover:decoration-[--color-signal]"
+        className="font-mono text-[--color-ink] underline decoration-[--color-signal-soft] underline-offset-4 hover:decoration-[--color-signal]"
       >
         {attestor.slice(0, 8)}…{attestor.slice(-6)}
       </a>
