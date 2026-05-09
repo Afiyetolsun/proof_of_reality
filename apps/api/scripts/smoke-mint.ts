@@ -151,13 +151,21 @@ const mint = (await mintRes.json()) as {
   explorerUrl: string;
 };
 
+// Swarm refs are 64-char hex; IPFS CIDs start with "Qm" (v0) or "bafy" (v1).
+const refUrl = (ref: string): string => {
+  if (/^[0-9a-f]{64}$/i.test(ref)) {
+    return `https://gateway.ethswarm.org/bzz/${ref}`;
+  }
+  return `https://gateway.pinata.cloud/ipfs/${ref}`;
+};
+
 console.log("\n✅ minted via iOS-shaped wire protocol");
 console.log(`  tokenId:  ${mint.tokenId}`);
 console.log(`  tx:       ${mint.txHash}`);
 console.log(`  explorer: ${mint.explorerUrl}`);
-console.log(`  scene:    https://gateway.pinata.cloud/ipfs/${upload.swarmRef}`);
+console.log(`  scene:    ${refUrl(upload.swarmRef)}`);
 if (upload.bundleRef) {
-  console.log(`  bundle:   https://gateway.pinata.cloud/ipfs/${upload.bundleRef}`);
+  console.log(`  bundle:   ${refUrl(upload.bundleRef)}`);
 }
 if (mint.ensName) {
   console.log(`  ens:      ${mint.ensName}`);
