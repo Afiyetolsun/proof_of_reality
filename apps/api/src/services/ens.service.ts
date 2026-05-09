@@ -294,6 +294,16 @@ export async function publishToEns(input: EnsPublishInput): Promise<EnsPublishRe
       nonce: baseNonce,
     } as never)) as Hex;
 
+    // Prefer the actual scene file for contenthash so opening the ENS
+    // name in a browser/wallet renders the 3D asset directly. Fall back
+    // to the bundle JSON only when the scene wasn't pinned to a
+    // resolvable ref (e.g. iOS local:<sha> mints, or a swarm/IPFS
+    // upload that we couldn't perform). encodeContenthash returns "0x"
+    // for unrecognised refs, which we use as the "not pinnable" signal.
+    const sceneCh = encodeContenthash(input.sceneCid);
+    const bundleCh = encodeContenthash(input.bundleRefCid);
+    const contenthash = sceneCh !== "0x" ? sceneCh : bundleCh;
+
     const proofTx = (await wallet.writeContract({
       address: e.ENS_RESOLVER_ADDRESS as Address,
       abi: RealityENSResolverAbi,
@@ -303,10 +313,7 @@ export async function publishToEns(input: EnsPublishInput): Promise<EnsPublishRe
         {
           attestor: input.attestor,
           bundleHash: input.bundleHash,
-          // Prefer the bundle JSON ref (canonical proof manifest); fall
-          // back to the scene ref so contenthash is at least non-empty
-          // for iOS mints that send bundleRef=local:<hash>.
-          contenthash: encodeContenthash(input.bundleRefCid || input.sceneCid),
+          contenthash,
           satSig: input.satSig,
           cosmoSig: input.cosmoSig,
           sceneCid: input.sceneCid,
