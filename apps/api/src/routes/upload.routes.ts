@@ -50,11 +50,17 @@ uploadRouter.post(
 
       const cosmoSig = await cosignBundle(bundleHashHex);
 
+      // Pass through filename + mimetype so Bee/Pinata serve the file
+      // with proper Content-Type + Content-Disposition. Otherwise the
+      // gateway returns a nameless application/octet-stream blob that
+      // browsers can't preview and macOS can't double-click open.
+      const sceneMime = sceneFile.mimetype || mimeFromName(sceneFile.originalname);
+      const audioMime = audioFile?.mimetype || (audioFile && mimeFromName(audioFile.originalname));
       const [scenePin, bundlePin, audioPin] = await Promise.all([
-        uploadToSwarm(new Uint8Array(sceneFile.buffer)),
-        uploadToSwarm(new Uint8Array(bundleFile.buffer)),
+        uploadToSwarm(new Uint8Array(sceneFile.buffer), sceneFile.originalname, sceneMime),
+        uploadToSwarm(new Uint8Array(bundleFile.buffer), "bundle.json", "application/json"),
         audioFile
-          ? uploadToSwarm(new Uint8Array(audioFile.buffer))
+          ? uploadToSwarm(new Uint8Array(audioFile.buffer), audioFile.originalname, audioMime)
           : Promise.resolve(null),
       ]);
 
@@ -73,3 +79,22 @@ uploadRouter.post(
     }
   },
 );
+
+/** Best-effort MIME guess from filename — backstop when multer doesn't
+ *  provide a useful mimetype (some iOS multipart configs don't). */
+function mimeFromName(name: string | undefined): string {
+  if (!name) return "application/octet-stream";
+  const ext = name.toLowerCase().split(".").pop() ?? "";
+  const map: Record<string, string> = {
+    usdz: "model/vnd.usdz+zip",
+    glb: "model/gltf-binary",
+    gltf: "model/gltf+json",
+    obj: "text/plain",
+    m4a: "audio/mp4",
+    mp4: "audio/mp4",
+    aac: "audio/aac",
+    wav: "audio/wav",
+    json: "application/json",
+  };
+  return map[ext] ?? "application/octet-stream";
+}
