@@ -432,26 +432,85 @@ def _clean_mesh(mesh):
     mesh.remove_unreferenced_vertices()
     mesh.remove_non_manifold_edges()
 
-    # Drop floating fragments: cluster connected triangles, keep only
-    # the largest. This is the mesh-side analogue of DBSCAN on points;
-    # catches the orphan surfaces TSDF emits around depth-discontinuity
-    # edges and any leftover ghost geometry from pose slips.
+    # Drop floating fragments. The previous "keep only the largest
+    # cluster" was too aggressive --- a real subject often gets split
+    # into several big chunks by depth-discontinuity gaps, and dropping
+    # all but one produced the Swiss-cheese holes visible on early
+    # captures. Threshold by triangle count instead: drop clusters
+    # smaller than max(50, 1% of total). Tiny orphans go, big chunks
+    # of the subject stay.
     if len(mesh.triangles) > 0:
         clusters, n_per, _ = mesh.cluster_connected_triangles()
         if len(n_per) > 0:
-            largest = int(np.argmax(n_per))
-            drop = np.asarray(clusters) != largest
-            mesh.remove_triangles_by_mask(drop)
-            mesh.remove_unreferenced_vertices()
+            n_per_arr = np.asarray(n_per)
+            min_keep = max(50, int(0.01 * n_per_arr.sum()))
+            keep_set = set(int(i) for i in np.where(n_per_arr >= min_keep)[0])
+            # Always retain the largest cluster, even if it's smaller than
+            # the threshold --- guards tiny meshes (e.g. test fixtures, or
+            # a scan that integrated very few frames) from being wiped.
+            keep_set.add(int(np.argmax(n_per_arr)))
+            drop = np.array([c not in keep_set for c in clusters])
+            if drop.any():
+                mesh.remove_triangles_by_mask(drop)
+                mesh.remove_unreferenced_vertices()
 
-    # One iteration of Taubin smoothing. Volume-preserving (unlike
-    # Laplacian) so it doesn't shrink the model; lightly smooths the
-    # marching-cubes stair-step without rounding off real corners.
-    if len(mesh.triangles) > 0:
-        mesh = mesh.filter_smooth_taubin(number_of_iterations=1)
-
+    # Note: Taubin smoothing was applied here previously, but on the
+    # already-noisy TSDF marching-cubes output it produced a melted /
+    # lumpy look without buying real quality. Skip --- callers who
+    # want a smoother surface should consume the Poisson artifact.
     mesh.compute_vertex_normals()
     return mesh
+
+
+def _poisson_reconstruct(pcd, depth=9, density_quantile=0.05):
+    """Screened-Poisson surface reconstruction with low-density crop.
+
+    Returns a watertight TriangleMesh that's far less "Swiss cheese" than
+    raw marching-cubes from a sparsely-observed TSDF, at the cost of
+    extrapolating geometry on the unseen side. We crop the lowest-density
+    Poisson vertices (default bottom 5%) which is the standard fix for
+    the ballooning artifact behind the camera.
+
+    Returns None if reconstruction fails (e.g. pcd too sparse for normal
+    estimation).
+    """
+    n_pts = len(pcd.points)
+    if n_pts < 500:
+        return None
+    try:
+        # Work on a copy so we don't mutate the PCD that's about to be
+        # written as the primary signed artifact.
+        p = o3d.geometry.PointCloud(pcd)
+        # Normal estimation needs a search radius / k. Use the cloud's
+        # own scale: the TSDF voxel length is a sensible neighbourhood.
+        p.estimate_normals(
+            search_param=o3d.geometry.KDTreeSearchParamHybrid(
+                radius=0.05, max_nn=30))
+        # Make normals point outward consistently --- Poisson is sensitive
+        # to flips. The tangent-plane MST orientation works well on
+        # surfaces with reasonable density.
+        p.orient_normals_consistent_tangent_plane(k=30)
+
+        mesh, densities = o3d.geometry.TriangleMesh.create_from_point_cloud_poisson(
+            p, depth=depth, n_threads=-1)
+        if mesh is None or len(mesh.triangles) == 0:
+            return None
+
+        densities = np.asarray(densities)
+        if len(densities) > 0:
+            cutoff = float(np.quantile(densities, density_quantile))
+            drop_v = densities < cutoff
+            if drop_v.any():
+                mesh.remove_vertices_by_mask(drop_v)
+
+        if len(mesh.triangles) == 0:
+            return None
+
+        mesh.compute_vertex_normals()
+        return mesh
+    except Exception as e:
+        print(f"[poisson] reconstruct failed: {type(e).__name__}: {e}")
+        return None
 
 
 def write_cloud(scan_id, pcd, mesh):
@@ -484,6 +543,22 @@ def write_cloud(scan_id, pcd, mesh):
             extra['mesh_sha256'] = _hash_file(mesh_path)
             extra['vertex_count'] = int(len(mesh.vertices))
             extra['triangle_count'] = int(len(mesh.triangles))
+
+    # Poisson reconstruction is the "looks solid" sibling output. Built
+    # from the cleaned PCD (so it benefits from the statistical-outlier
+    # pass already applied above), watertight, fills the holes that
+    # marching-cubes leaves around sparse TSDF voxels. Extrapolates on
+    # the unseen back side --- low-density crop in _poisson_reconstruct
+    # keeps that within reason.
+    poisson_mesh = _poisson_reconstruct(pcd)
+    if poisson_mesh is not None and len(poisson_mesh.triangles) > 0:
+        poisson_path = SCANS_DIR / f"{scan_id}.poisson.ply"
+        o3d.io.write_triangle_mesh(str(poisson_path), poisson_mesh,
+                                   write_ascii=False)
+        extra['poisson_artifact'] = poisson_path.name
+        extra['poisson_sha256'] = _hash_file(poisson_path)
+        extra['poisson_vertex_count'] = int(len(poisson_mesh.vertices))
+        extra['poisson_triangle_count'] = int(len(poisson_mesh.triangles))
 
     return pcd_path, extra
 

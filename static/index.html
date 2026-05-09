@@ -244,6 +244,7 @@ async function refreshScans() {
       <div class="meta">
         <a href="/scans/${artifact}" download>${artifact.split('.').pop().toUpperCase()}</a> ·
         ${s.mesh_artifact ? `<a href="/scans/${s.mesh_artifact}" download>MESH</a> · ` : ''}
+        ${s.poisson_artifact ? `<a href="/scans/${s.poisson_artifact}" download>POISSON</a> · ` : ''}
         <a href="/scans/${s.scan_id}.json" target="_blank">envelope</a>
       </div>
     </div>`;
