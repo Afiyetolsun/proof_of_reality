@@ -151,6 +151,11 @@ class CaptureManager:
             if self.last_rgbd is not None:
                 opt = o3d.pipelines.odometry.OdometryOption()
                 opt.depth_max = self.depth_max
+                # depth_diff_max defaults to 3 cm; tighter (1.5 cm) rejects
+                # frame-pairs whose warped depth disagrees more than that ---
+                # those are typically the pose-slip frames that produce the
+                # duplicated-geometry artifacts visible at 3 cm tolerance.
+                opt.depth_diff_max = 0.015
                 ok, T_rel, _ = o3d.pipelines.odometry.compute_rgbd_odometry(
                     rgbd, self.last_rgbd, self.K_o3d, np.eye(4),
                     o3d.pipelines.odometry.RGBDOdometryJacobianFromHybridTerm(),
@@ -259,6 +264,12 @@ def build_pipeline(args, mgr, stop_event):
         left = pipeline.create(dai.node.Camera).build(dai.CameraBoardSocket.CAM_B)
         right = pipeline.create(dai.node.Camera).build(dai.CameraBoardSocket.CAM_C)
         cam = pipeline.create(dai.node.Camera).build(dai.CameraBoardSocket.CAM_A)
+
+        # Lock auto-exposure on the colour camera once the pipeline starts.
+        # Frame-to-frame brightness changes from AE re-balancing show up
+        # as photometric "motion" to the visual odometry matcher and are
+        # a top contributor to pose drift on otherwise-static scenes.
+        cam.initialControl.setAutoExposureLock(True)
 
         left_out = left.requestOutput((WIDTH, HEIGHT), type=dai.ImgFrame.Type.NV12, fps=args.fps)
         right_out = right.requestOutput((WIDTH, HEIGHT), type=dai.ImgFrame.Type.NV12, fps=args.fps)
