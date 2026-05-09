@@ -34,8 +34,8 @@ struct ProofHistoryView: View {
                 .listStyle(.insetGrouped)
             }
         }
-        .navigationTitle("History")
-        .navigationBarTitleDisplayMode(.inline)
+        .navigationTitle("Scans")
+        .navigationBarTitleDisplayMode(.large)
         .task { await reload() }
     }
 

@@ -1,41 +1,28 @@
 import SwiftUI
 
+/// Home tab content. The history surface used to live behind a toolbar
+/// button here; it's now a peer tab in MainTabView so the user can move
+/// between Home and Scans without a back-stack.
 struct RootView: View {
     @State private var selectedMode: ScanMode?
-    @State private var showHistory = false
 
     var body: some View {
-        NavigationStack {
-            VStack(alignment: .leading, spacing: 28) {
-                header
+        VStack(alignment: .leading, spacing: 28) {
+            header
 
-                modeList
+            modeList
 
-                Spacer(minLength: 0)
-            }
-            .padding(.horizontal, 24)
-            .padding(.top, 16)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        showHistory = true
-                    } label: {
-                        Image(systemName: "clock.arrow.circlepath")
-                    }
-                    .accessibilityLabel("Proof history")
-                }
-            }
-            .navigationDestination(item: $selectedMode) { mode in
-                switch mode {
-                case .roomPlan:
-                    RoomPlanCaptureView()
-                case .objectCapture:
-                    ObjectCaptureScanView()
-                }
-            }
-            .navigationDestination(isPresented: $showHistory) {
-                ProofHistoryView()
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 24)
+        .padding(.top, 16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .navigationDestination(item: $selectedMode) { mode in
+            switch mode {
+            case .roomPlan:
+                RoomPlanCaptureView()
+            case .objectCapture:
+                ObjectCaptureScanView()
             }
         }
     }
