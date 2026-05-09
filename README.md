@@ -262,8 +262,8 @@ CAMERA_SHARED_SECRET=<32-byte-hex> \
 
 Re-run any time you change the code; the script tears down the previous
 install before pushing the new one. Env defaults: `BACKEND_URL` →
-`https://proof-of-reality-api.vercel.app`. Override via env var to point
-at staging.
+`https://api.realityproof.app`. Override via env var to point at
+staging.
 
 #### Runtime config (set via `oakctl app config set`)
 

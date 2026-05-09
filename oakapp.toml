@@ -15,7 +15,7 @@ build_steps = []
 # Runtime config is read from env vars by main.py. Push them with
 #   oakctl app config set <app-id> --env KEY=VALUE [--restart]
 # Variables:
-#   BACKEND_URL            (e.g. https://proof-of-reality-api.vercel.app)
+#   BACKEND_URL            (e.g. https://api.realityproof.app)
 #   CAMERA_SHARED_SECRET   (preferred; pairs with backend's CAMERA_SHARED_SECRET)
 #   IOS_SHARED_SECRET      (legacy fallback)
 #   GOTEE_HOST/GOTEE_PORT  (default 10.0.0.1:4000 — overridden below to OAK's

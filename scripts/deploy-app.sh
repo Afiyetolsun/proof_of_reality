@@ -10,7 +10,7 @@
 #
 # Recommended env (omit either to skip the corresponding config update):
 #   CAMERA_SHARED_SECRET      pairs with backend's CAMERA_SHARED_SECRET
-#   BACKEND_URL               default: https://proof-of-reality-api.vercel.app
+#   BACKEND_URL               default: https://api.realityproof.app
 #
 # Direct-storage env (omit to leave the OAK in api-only mode, in which
 # scenes >4MB silently downgrade to local:<sha> and aren't pinned):
@@ -38,7 +38,7 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OAK_DEVICE="${OAK_DEVICE:-1}"
-BACKEND_URL="${BACKEND_URL:-https://proof-of-reality-api.vercel.app}"
+BACKEND_URL="${BACKEND_URL:-https://api.realityproof.app}"
 IDENTIFIER="${IDENTIFIER:-$(awk -F\" '/^identifier/ {print $2; exit}' "$REPO_ROOT/oakapp.toml")}"
 PKG_DIR="${PKG_DIR:-/tmp/oak-scan-and-sign-pkg}"
 

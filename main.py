@@ -106,7 +106,7 @@ def parse_args():
     p.add_argument("--video-max-frames", type=int, default=600,
                    help="Hard cap on video-mode frames to bound RAM use")
     p.add_argument("--backend-url", default=_env("BACKEND_URL"),
-                   help="proof-of-reality backend (e.g. https://proof-of-reality-api.vercel.app). "
+                   help="proof-of-reality backend (e.g. https://api.realityproof.app). "
                         "Empty = backend disabled, scans stay local.")
     p.add_argument("--shared-secret",
                    default=_env("CAMERA_SHARED_SECRET", _env("IOS_SHARED_SECRET")),
