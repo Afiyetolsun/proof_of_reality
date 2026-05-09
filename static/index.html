@@ -21,6 +21,9 @@
   .row { display: flex; align-items: center; gap: 6px; margin: 8px 0; flex-wrap: wrap; }
   .pill { padding: 2px 8px; border-radius: 999px; font-size: 12px; background: #8884; }
   .pill.live { background: #c33; color: white; }
+  .pill.ok { background: #1a7; color: white; }
+  .pill.bad { background: #c33; color: white; }
+  .pill.warn { background: #c80; color: white; }
   .pill.mode-photo { background: #246; color: white; }
   .pill.mode-video { background: #c33; color: white; }
   .pill.mode-cloud { background: #5a3; color: white; }
@@ -33,11 +36,19 @@
   a { color: inherit; }
   hr { border: 0; border-top: 1px solid #8884; margin: 14px 0; }
   small { color: #888; font-size: 11px; }
+  .mint { background: #1a710; padding: 6px 8px; border-radius: 6px; margin-top: 6px;
+          border: 1px solid #1a740; font-size: 12px; }
+  .mint a { color: inherit; }
 </style>
 </head>
 <body>
 <aside>
   <h1>Scan &amp; Sign</h1>
+
+  <div class="row">
+    <span class="pill" id="token">token: ?</span>
+    <span class="pill" id="backend">backend: ?</span>
+  </div>
 
   <div class="row">
     <button id="btn-photo" class="photo" title="Capture the current frame as a colored PLY">📷 Photo</button>
@@ -118,6 +129,42 @@ async function refreshState() {
   } catch {}
 }
 
+async function refreshHealth() {
+  try {
+    const r = await fetch('/healthz');
+    const h = await r.json();
+    const t = $('token');
+    t.textContent = `token: ${h.token.connected ? 'connected' : 'disconnected'}`;
+    t.className = `pill ${h.token.connected ? 'ok' : 'bad'}`;
+    t.title = h.token.msg;
+
+    const b = $('backend');
+    if (h.backend.url === null) {
+      b.textContent = 'backend: disabled';
+      b.className = 'pill warn';
+    } else {
+      b.textContent = `backend: ${h.backend.ok ? 'ok' : 'down'}`;
+      b.className = `pill ${h.backend.ok ? 'ok' : 'bad'}`;
+    }
+    b.title = h.backend.msg;
+  } catch {}
+}
+
+function renderMint(m) {
+  if (!m || !m.txHash) return '';
+  const tx = `<a href="https://sepolia.basescan.org/tx/${m.txHash}" target="_blank">tx ${m.txHash.slice(0,10)}…</a>`;
+  const ens = m.ensName ? ` · <a href="https://sepolia.app.ens.domains/${m.ensName}" target="_blank">${m.ensName}</a>` : '';
+  const tok = m.tokenId ? ` · token #${m.tokenId}` : '';
+  return `<div class="mint">${tx}${tok}${ens}</div>`;
+}
+
+function renderBackendErr(b) {
+  if (!b) return '';
+  if (b.error) return `<div class="err meta">backend: ${b.error}</div>`;
+  if (b.nonce_error) return `<div class="err meta">nonce: ${b.nonce_error}</div>`;
+  return '';
+}
+
 function fmtPts(n) {
   return (n == null) ? '—' : Number(n).toLocaleString();
 }
@@ -141,6 +188,12 @@ async function refreshScans() {
     const pts = fmtPts(s.point_count);
     const sha = s.artifact_sha256 || s.ply_sha256 || '';
     const artifact = s.artifact || `${s.scan_id}.ply`;
+    const bundleHash = s.bundle_hash
+      ? `<div class="meta"><code>bundle ${s.bundle_hash.slice(0,18)}…</code></div>`
+      : '';
+    const bundleLink = s.bundle_hash
+      ? ` · <a href="/scans/${s.scan_id}.bundle.json" target="_blank">bundle</a>`
+      : '';
     return `<div class="scan">
       <div>${modePill(s.mode)} <strong>${s.scan_id}</strong> &nbsp; ${macHtml}</div>
       <div class="meta">
@@ -152,9 +205,12 @@ async function refreshScans() {
       <div class="meta">
         <code>sha256 ${sha}</code>
       </div>
+      ${bundleHash}
+      ${renderMint(s.mint)}
+      ${renderBackendErr(s.backend)}
       <div class="meta">
         <a href="/scans/${artifact}" download>${artifact.split('.').pop().toUpperCase()}</a> ·
-        <a href="/scans/${s.scan_id}.json" target="_blank">envelope</a>
+        <a href="/scans/${s.scan_id}.json" target="_blank">envelope</a>${bundleLink}
       </div>
     </div>`;
   }).join('') || '<div style="color:#888;font-size:13px">no scans yet</div>';
@@ -199,8 +255,10 @@ $('btn-cloud').onclick = () => startRecording('cloud');
 $('btn-stop').onclick = stopRecording;
 
 setInterval(refreshState, 500);
+setInterval(refreshHealth, 2500);
 setInterval(refreshScans, 3000);
 refreshState();
+refreshHealth();
 refreshScans();
 </script>
 </body>
