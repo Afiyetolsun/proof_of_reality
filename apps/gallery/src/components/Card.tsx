@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { SubnameRecord } from "@/lib/ens-records";
 import { contentDirectUrl, ensAppForName, viewerForName } from "@/lib/viewer-link";
 import { Eyebrow } from "./Eyebrow";
-import { Mono, shortHex, shortAddress } from "./Mono";
+import { Mono, shortHex } from "./Mono";
 import { CardThumbnail } from "./CardThumbnail";
 import { CardScene } from "./CardScene";
 
@@ -22,11 +22,7 @@ export function Card({ record }: { record: SubnameRecord }) {
           className="block focus:outline-none"
           aria-label={`Verify ${record.name}`}
         >
-          <CardThumbnail
-            bundleHash={record.bundleHash}
-            contentRef={record.content?.ref ?? null}
-            label={record.labelName}
-          />
+          <CardThumbnail mode={record.mode ?? null} label={record.labelName} />
         </Link>
 
         {sceneUrl && <CardScene url={sceneUrl} detailHref={viewerHref} />}
@@ -70,23 +66,13 @@ export function Card({ record }: { record: SubnameRecord }) {
           </p>
         )}
 
-        <dl className="mt-auto grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 pt-2">
+        <dl className="mt-auto grid grid-cols-[5rem_1fr] items-center gap-x-3 gap-y-1.5 pt-2">
           {record.bundleHash && (
             <>
               <dt className="text-mono-xs text-[--color-accent]">bundle</dt>
-              <dd>
+              <dd className="m-0">
                 <Mono className="text-mono-xs text-[--color-ink]" title={record.bundleHash}>
                   {shortHex(record.bundleHash, 6, 6)}
-                </Mono>
-              </dd>
-            </>
-          )}
-          {record.attestor && (
-            <>
-              <dt className="text-mono-xs text-[--color-accent]">attestor</dt>
-              <dd>
-                <Mono className="text-mono-xs text-[--color-ink]" title={record.attestor}>
-                  {shortAddress(record.attestor)}
                 </Mono>
               </dd>
             </>
@@ -94,7 +80,7 @@ export function Card({ record }: { record: SubnameRecord }) {
           {record.content && (
             <>
               <dt className="text-mono-xs text-[--color-accent]">{record.content.protocol}</dt>
-              <dd>
+              <dd className="m-0">
                 <a
                   href={contentDirectUrl(record.content)}
                   target="_blank"

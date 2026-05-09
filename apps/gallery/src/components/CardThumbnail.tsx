@@ -1,142 +1,153 @@
 /**
- * Hash-derived thumbnail. We don't render USDZ inline on cards (Pixar's
- * USD WASM is heavy and needs cross-origin isolation; the per-name
- * viewer handles it). Instead the thumbnail is a deterministic
- * gradient + abstract sigil derived from the bundleHash, so each scan
- * gets a unique-looking surface that the user can recognize after
- * they've seen it once.
+ * Type-based card thumbnail. Each capture mode gets a recognizable
+ * isometric pictogram in the brand orange against a subtle warm
+ * gradient — readable at glance, no scan-by-scan WebGL contexts on the
+ * grid. The 3D preview itself is still mounted on click via
+ * <CardScene> which sits absolutely over this surface.
  *
- * The sigil is two offset orbs (a nod to "physical object + orbital
- * witness") whose radii / placement come from hash bytes. No randomness,
- * no fetches.
+ * Why a fixed pictogram instead of a per-scan SSR snapshot:
+ * - Per-scan thumbnails require server-side three.js or pre-baked PNGs
+ *   on Swarm — both add infra that doesn't exist for the hackathon.
+ * - Per-scan thumbnails for RoomPlan look indistinguishable from each
+ *   other anyway (white-on-white planes silhouette identically).
+ * - The real differentiator (the actual scan) is one click away.
  */
-import type { Hex } from "viem";
-
 interface Props {
-  bundleHash: Hex | null;
-  contentRef: string | null;
+  mode: string | null;
   label: string;
 }
 
-export function CardThumbnail({ bundleHash, contentRef, label }: Props) {
-  const seed = bundleHash ?? (contentRef ? `0x${contentRef.slice(0, 64)}` : null);
-  const t = seed ? seedToTokens(seed) : neutralTokens(label);
+export function CardThumbnail({ mode, label }: Props) {
+  const kind = (mode ?? "").toLowerCase();
+  const variant: Variant =
+    kind === "roomplan" || kind === "room"
+      ? "room"
+      : kind === "objectcapture" || kind === "object"
+        ? "object"
+        : "generic";
 
   return (
     <div
       className="relative aspect-[4/3] w-full overflow-hidden border-b border-[--color-rule]"
-      aria-hidden="true"
+      role="img"
+      aria-label={`${variant} capture preview for ${label}`}
     >
+      {/* Warm dark gradient — subtle copper/orange wash at the top-right
+          so the orange pictogram has a complementary background. */}
       <div
         className="absolute inset-0"
         style={{
-          background: `linear-gradient(${t.gradAngle}deg, ${t.bg1} 0%, ${t.bg2} 100%)`,
+          background:
+            "radial-gradient(circle at 80% 10%, oklch(0.30 0.05 58 / 0.55), transparent 55%), linear-gradient(180deg, oklch(0.21 0.014 250) 0%, oklch(0.16 0.012 250) 100%)",
         }}
       />
-      <svg
-        className="absolute inset-0 h-full w-full"
-        viewBox="0 0 400 300"
-        preserveAspectRatio="xMidYMid slice"
-        role="presentation"
-      >
-        <defs>
-          <radialGradient id={`g-${t.id}-1`} cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor={t.orb1} stopOpacity="0.85" />
-            <stop offset="60%" stopColor={t.orb1} stopOpacity="0.25" />
-            <stop offset="100%" stopColor={t.orb1} stopOpacity="0" />
-          </radialGradient>
-          <radialGradient id={`g-${t.id}-2`} cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor={t.orb2} stopOpacity="0.7" />
-            <stop offset="70%" stopColor={t.orb2} stopOpacity="0.15" />
-            <stop offset="100%" stopColor={t.orb2} stopOpacity="0" />
-          </radialGradient>
-        </defs>
-        <circle cx={t.c1x} cy={t.c1y} r={t.r1} fill={`url(#g-${t.id}-1)`} />
-        <circle cx={t.c2x} cy={t.c2y} r={t.r2} fill={`url(#g-${t.id}-2)`} />
-        {/* Hairline ring — the "orbital" cue */}
-        <circle
-          cx={t.c1x}
-          cy={t.c1y}
-          r={t.r1 + 18}
-          fill="none"
-          stroke={t.orb1}
-          strokeOpacity="0.18"
-          strokeWidth="1"
-        />
-      </svg>
 
-      {/* Subtle grain so the gradient doesn't look like SaaS slop */}
+      {/* Faint dot grid for a "blueprint" feel — same on every card so
+          the pictogram is what differentiates them, not the texture. */}
       <div
         className="pointer-events-none absolute inset-0 opacity-[0.18]"
         style={{
           backgroundImage:
-            "radial-gradient(circle at 1px 1px, oklch(0.97 0.008 85 / 0.12) 1px, transparent 0)",
-          backgroundSize: "3px 3px",
+            "radial-gradient(circle at 1px 1px, oklch(0.97 0.008 85 / 0.10) 1px, transparent 0)",
+          backgroundSize: "8px 8px",
         }}
       />
+
+      <svg
+        className="absolute inset-0 h-full w-full"
+        viewBox="0 0 400 300"
+        preserveAspectRatio="xMidYMid meet"
+        role="presentation"
+      >
+        <Pictogram variant={variant} />
+      </svg>
     </div>
   );
 }
 
-interface Tokens {
-  id: string;
-  bg1: string;
-  bg2: string;
-  orb1: string;
-  orb2: string;
-  gradAngle: number;
-  c1x: number;
-  c1y: number;
-  r1: number;
-  c2x: number;
-  c2y: number;
-  r2: number;
-}
+type Variant = "room" | "object" | "generic";
 
-function seedToTokens(seed: string): Tokens {
-  const hex = seed.replace(/^0x/, "");
-  const b = (i: number) => parseInt(hex.slice(i * 2, i * 2 + 2), 16) || 0;
+function Pictogram({ variant }: { variant: Variant }) {
+  // Single shared visual language: 1.5px orange strokes, no fills, no
+  // shadows. Matches the per-proof page's mono-on-dark aesthetic.
+  const stroke = "oklch(0.80 0.16 58)";
+  const strokeFaint = "oklch(0.80 0.16 58 / 0.35)";
 
-  // Hue families anchored to the brand palette: signal copper (50–80),
-  // a deep blue companion (220–260), and a muted teal (160–200). Pick
-  // two distinct families so we never get a same-hue card.
-  const hueA = pickHue(b(0));
-  const hueB = pickHueExcluding(b(1), hueA);
+  if (variant === "room") {
+    // Isometric floor plan — outer rectangle, one interior wall, a
+    // door cutout. Reads as "apartment" without being literal.
+    return (
+      <g
+        fill="none"
+        stroke={stroke}
+        strokeWidth="2"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+        transform="translate(80 60)"
+      >
+        {/* Floor (isometric parallelogram) */}
+        <path d="M 0 90 L 110 30 L 240 90 L 130 150 Z" stroke={strokeFaint} />
+        {/* Back wall */}
+        <path d="M 0 90 L 110 30 L 110 -10 L 0 50 Z" />
+        {/* Right wall */}
+        <path d="M 110 30 L 240 90 L 240 50 L 110 -10 Z" />
+        {/* Front-right wall (with door cutout) */}
+        <path d="M 240 90 L 130 150 L 130 110 L 175 87" />
+        <path d="M 195 77 L 240 50 L 240 90" />
+        {/* Door opening hint */}
+        <path
+          d="M 175 87 L 175 127 L 195 117 L 195 77"
+          stroke={strokeFaint}
+        />
+      </g>
+    );
+  }
 
-  const bg1 = `oklch(0.20 0.02 ${hueA})`;
-  const bg2 = `oklch(0.13 0.018 ${hueB})`;
-  const orb1 = `oklch(0.62 0.14 ${hueA})`;
-  const orb2 = `oklch(0.55 0.12 ${hueB})`;
+  if (variant === "object") {
+    // Isometric cube on a faint floor plane — reads as "object on
+    // surface", which is what Object Capture produces.
+    return (
+      <g
+        fill="none"
+        stroke={stroke}
+        strokeWidth="2"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+        transform="translate(120 70)"
+      >
+        {/* Faint floor disc — gives the cube somewhere to sit */}
+        <ellipse
+          cx="80"
+          cy="160"
+          rx="120"
+          ry="22"
+          stroke={strokeFaint}
+          strokeWidth="1.5"
+        />
+        {/* Top face */}
+        <path d="M 80 30 L 160 70 L 80 110 L 0 70 Z" />
+        {/* Left face */}
+        <path d="M 0 70 L 80 110 L 80 170 L 0 130 Z" />
+        {/* Right face */}
+        <path d="M 160 70 L 80 110 L 80 170 L 160 130 Z" />
+        {/* Top X for visual interest — looks like a wireframe hint */}
+        <path d="M 0 70 L 160 70 M 80 30 L 80 110" stroke={strokeFaint} />
+      </g>
+    );
+  }
 
-  const gradAngle = (b(2) % 90) + 130; // 130–219, top-leftish drift
-  const c1x = 80 + (b(3) % 240);
-  const c1y = 40 + (b(4) % 220);
-  const r1 = 80 + (b(5) % 80);
-  const c2x = 60 + (b(6) % 280);
-  const c2y = 30 + (b(7) % 240);
-  const r2 = 50 + (b(8) % 90);
-
-  return { id: hex.slice(0, 6), bg1, bg2, orb1, orb2, gradAngle, c1x, c1y, r1, c2x, c2y, r2 };
-}
-
-function neutralTokens(label: string): Tokens {
-  // Fallback for records without bundleHash or contenthash. Hash the
-  // label so even unhydrated rows get a stable visual.
-  let h = 5381;
-  for (let i = 0; i < label.length; i++) h = ((h << 5) + h + label.charCodeAt(i)) | 0;
-  const seed = (Math.abs(h).toString(16) + "0".repeat(64)).slice(0, 64);
-  return seedToTokens(`0x${seed}`);
-}
-
-function pickHue(byte: number): number {
-  const family = byte % 3;
-  const offset = byte & 0x1f;
-  if (family === 0) return 50 + (offset % 30); // copper 50–79
-  if (family === 1) return 220 + (offset % 40); // deep blue 220–259
-  return 160 + (offset % 40); // teal 160–199
-}
-function pickHueExcluding(byte: number, other: number): number {
-  let h = pickHue(byte);
-  if (Math.abs(h - other) < 30) h = (h + 80) % 360;
-  return h;
+  // Generic / unknown — a simple ◆ glyph centered, same as the brand
+  // hero. Better than a random gradient blob.
+  return (
+    <g
+      fill="none"
+      stroke={stroke}
+      strokeWidth="2.5"
+      strokeLinejoin="round"
+      transform="translate(170 90)"
+    >
+      <path d="M 30 0 L 60 60 L 30 120 L 0 60 Z" />
+      <path d="M 30 30 L 45 60 L 30 90 L 15 60 Z" stroke={strokeFaint} />
+    </g>
+  );
 }

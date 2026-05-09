@@ -31,7 +31,24 @@ export default async function GalleryPage({ searchParams }: PageProps) {
 
   return (
     <main id="content" className="pb-20">
-      <section className="mx-auto max-w-[880px] px-5 pb-10 pt-16 text-center md:pt-20">
+      <nav className="mx-auto flex max-w-[1280px] items-center justify-between px-5 pt-6 text-mono-s">
+        <a
+          href="https://realityproof.app"
+          className="text-[--color-ink-mute] transition-colors hover:text-[--color-ink]"
+        >
+          ← realityproof.app
+        </a>
+        <a
+          href="https://github.com/Afiyetolsun/proof_of_reality"
+          target="_blank"
+          rel="noreferrer"
+          className="text-[--color-ink-mute] transition-colors hover:text-[--color-ink]"
+        >
+          GitHub ↗
+        </a>
+      </nav>
+
+      <section className="mx-auto max-w-[880px] px-5 pb-10 pt-12 text-center md:pt-16">
         <div
           aria-hidden
           className="mx-auto text-[44px] leading-none text-[--color-signal]"
@@ -69,14 +86,6 @@ export default async function GalleryPage({ searchParams }: PageProps) {
 
       <footer className="mx-auto mt-16 flex max-w-[1280px] items-center justify-between border-t border-[--color-rule] px-5 pt-5 text-mono-s text-[--color-ink-mute]">
         <span>Built for ETHPrague 2026 · SpaceComputer + ENS + Swarm</span>
-        <a
-          href="https://github.com/Afiyetolsun/proof_of_reality"
-          target="_blank"
-          rel="noreferrer"
-          className="text-[--color-link] transition-colors hover:opacity-80"
-        >
-          GitHub ↗
-        </a>
       </footer>
     </main>
   );
@@ -142,9 +151,6 @@ function applyFilters(records: SubnameRecord[], f: FilterState): SubnameRecord[]
   let out = records;
   if (f.mode !== "all") {
     out = out.filter((r) => r.mode === f.mode);
-  }
-  if (f.hasToken) {
-    out = out.filter((r) => r.tokenId !== null);
   }
   out = [...out].sort((a, b) =>
     f.sort === "newest" ? b.createdAt - a.createdAt : a.createdAt - b.createdAt,

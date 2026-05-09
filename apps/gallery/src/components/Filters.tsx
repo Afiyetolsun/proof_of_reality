@@ -3,17 +3,16 @@ import Link from "next/link";
 export type Sort = "newest" | "oldest";
 /**
  * Mode values match `CAPTURE_MODES` in packages/proof-bundle/src/schema.ts.
- * If new modes get added there, add them here too — type-checking won't
- * catch the drift since we read modes as plain strings off-chain.
+ * stereoFusion exists in the schema but no scans use it yet, so we don't
+ * surface it in the filter UI — when (if) it ships, add a "stereo" pill.
  */
-export type ModeFilter = "all" | "roomPlan" | "objectCapture" | "stereoFusion";
+export type ModeFilter = "all" | "roomPlan" | "objectCapture";
 
-const MODE_VALUES = ["roomPlan", "objectCapture", "stereoFusion"] as const;
+const MODE_VALUES = ["roomPlan", "objectCapture"] as const;
 
 export interface FilterState {
   sort: Sort;
   mode: ModeFilter;
-  hasToken: boolean;
 }
 
 export function parseFilters(sp: Record<string, string | string[] | undefined>): FilterState {
@@ -26,8 +25,7 @@ export function parseFilters(sp: Record<string, string | string[] | undefined>):
   const mode: ModeFilter = (MODE_VALUES as readonly string[]).includes(modeRaw ?? "")
     ? (modeRaw as ModeFilter)
     : "all";
-  const hasToken = get("token") === "1";
-  return { sort, mode, hasToken };
+  return { sort, mode };
 }
 
 function buildHref(state: FilterState, override: Partial<FilterState>): string {
@@ -35,7 +33,6 @@ function buildHref(state: FilterState, override: Partial<FilterState>): string {
   const params = new URLSearchParams();
   if (next.sort !== "newest") params.set("sort", next.sort);
   if (next.mode !== "all") params.set("mode", next.mode);
-  if (next.hasToken) params.set("token", "1");
   const qs = params.toString();
   return qs ? `/?${qs}` : "/";
 }
@@ -57,9 +54,6 @@ export function Filters({ state, total }: { state: FilterState; total: number })
         <Pill href={buildHref(state, { mode: "roomPlan" })} active={state.mode === "roomPlan"}>
           room
         </Pill>
-        <Pill href={buildHref(state, { mode: "stereoFusion" })} active={state.mode === "stereoFusion"}>
-          stereo
-        </Pill>
       </FilterGroup>
 
       <FilterGroup label="sort">
@@ -68,15 +62,6 @@ export function Filters({ state, total }: { state: FilterState; total: number })
         </Pill>
         <Pill href={buildHref(state, { sort: "oldest" })} active={state.sort === "oldest"}>
           oldest
-        </Pill>
-      </FilterGroup>
-
-      <FilterGroup label="onchain">
-        <Pill href={buildHref(state, { hasToken: false })} active={!state.hasToken}>
-          any
-        </Pill>
-        <Pill href={buildHref(state, { hasToken: true })} active={state.hasToken}>
-          minted
         </Pill>
       </FilterGroup>
     </div>
