@@ -21,6 +21,36 @@ const HASH32_RE = /^0x[0-9a-fA-F]{64}$/;
  * coerced to a single placeholder byte so the contract's non-empty check
  * passes during dev.
  */
+/**
+ * ENS label contract — must match iOS exactly.
+ *
+ * Rules: 3-32 chars, lowercase a-z / digits / hyphen, must start AND end
+ * with alphanumeric, no consecutive hyphens. The regex enforces all of
+ * those (the inner group `(-?[a-z0-9])+` allows at most a single hyphen
+ * between alphanumerics → no `--`, and forces the final char to be
+ * alphanumeric).
+ *
+ * Defensively .trim() + .toLowerCase() before validating so iOS sending
+ * mixed case or stray whitespace doesn't 400 the whole mint. Empty/blank
+ * strings are coerced to undefined so they don't fall into the 3-char min.
+ */
+const ENS_LABEL_RE = /^[a-z0-9](-?[a-z0-9])+$/;
+const labelSchema = z
+  .string()
+  .optional()
+  .transform((s) => {
+    if (s === undefined) return undefined;
+    const t = s.trim().toLowerCase();
+    return t === "" ? undefined : t;
+  })
+  .refine(
+    (s) => s === undefined || (s.length >= 3 && s.length <= 32 && ENS_LABEL_RE.test(s)),
+    {
+      message:
+        "label must be 3-32 chars: lowercase a-z/0-9/hyphen, start+end alphanumeric, no '--'",
+    },
+  );
+
 const MintBody = z.object({
   swarmRef: z.string().min(1),
   bundleRef: z.string().min(1),
@@ -34,6 +64,7 @@ const MintBody = z.object({
   recipient: z.string().regex(ADDRESS_RE).optional(),
   capturedAt: z.coerce.number().int().nonnegative(),
   mode: z.coerce.number().int().min(0).max(2),
+  label: labelSchema,
 });
 
 export const mintRouter: RouterT = Router();
@@ -84,6 +115,7 @@ mintRouter.post("/", async (req, res, next) => {
         capturedAt: a.capturedAt,
         tokenId: result.tokenId,
         mode: a.mode as 0 | 1 | 2,
+        label: a.label,
       });
       if (publishResult) {
         console.log(`[mint] ENS published: ${publishResult.subname}`);
@@ -92,19 +124,13 @@ mintRouter.post("/", async (req, res, next) => {
       console.warn("[mint] ENS publish error:", (e as Error).message);
     }
 
-    // Fallback: if ENS publish failed, still return the deterministic predicted
-    // name so iOS has something to display.
-    const fallbackEnsName = (() => {
-      if (!env().ENS_PARENT_NAME) return null;
-      const slug = a.bundleHash.replace(/^0x/, "").slice(0, 12).toLowerCase();
-      return `vin-${slug}.${env().ENS_PARENT_NAME}`;
-    })();
-
     res.json({
-      // iOS-canonical fields
+      // iOS-canonical fields. ensName reflects what actually landed on-chain
+      // (post-collision-handling). null when ENS publish failed or was skipped
+      // — iOS treats null as "don't render the ENS row" rather than guessing.
       txHash: result.txHash,
       tokenId: result.tokenId,
-      ensName: publishResult?.subname ?? fallbackEnsName ?? result.ensName,
+      ensName: publishResult?.subname ?? null,
       stub: false,
       // additive
       explorerUrl: `https://sepolia.basescan.org/tx/${result.txHash}`,

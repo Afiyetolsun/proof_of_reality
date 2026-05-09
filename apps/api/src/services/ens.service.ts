@@ -56,6 +56,13 @@ const ENS_REGISTRY_ABI = [
     inputs: [{ name: "node", type: "bytes32" }],
     outputs: [{ name: "", type: "address" }],
   },
+  {
+    type: "function",
+    name: "recordExists",
+    stateMutability: "view",
+    inputs: [{ name: "node", type: "bytes32" }],
+    outputs: [{ name: "", type: "bool" }],
+  },
 ] as const;
 
 let _publicClient: ReturnType<typeof createPublicClient> | undefined;
@@ -93,6 +100,7 @@ export interface EnsPublishInput {
   capturedAt: number;
   tokenId: string;
   mode: 0 | 1 | 2;
+  label?: string;           // user-chosen subname; nil = use default vin-<hash[2:14]>
 }
 
 export interface EnsPublishResult {
@@ -102,13 +110,36 @@ export interface EnsPublishResult {
 }
 
 /**
- * Build the subname from the bundle hash. Predictable + collision-free
- * since bundleHash is unique on-chain.
+ * Default deterministic label for a bundle: `vin-<hash[2:14]>`.
+ * Collision-free because bundleHash is unique on-chain.
+ */
+function defaultLabel(bundleHash: Hex): string {
+  const slug = bundleHash.replace(/^0x/, "").slice(0, 12).toLowerCase();
+  return `vin-${slug}`;
+}
+
+/**
+ * Pick the desired (pre-collision-check) subname. If the caller passed a
+ * user-chosen label we honour it; otherwise we fall through to the
+ * deterministic vin- form.
+ */
+export function buildDesiredSubname(
+  bundleHash: Hex,
+  label: string | undefined,
+  parent: string,
+): { label: string; full: string; userSupplied: boolean } {
+  const userSupplied = !!label;
+  const primary = label ?? defaultLabel(bundleHash);
+  return { label: primary, full: `${primary}.${parent}`, userSupplied };
+}
+
+/**
+ * Back-compat shim. Older callers (verifier scripts, tests) just want the
+ * deterministic name from a bundleHash; preserve that signature.
  */
 export function buildSubname(bundleHash: Hex): { label: string; full: string } {
-  const slug = bundleHash.replace(/^0x/, "").slice(0, 12).toLowerCase();
-  const label = `vin-${slug}`;
   const parent = env().ENS_PARENT_NAME ?? "realityproof.eth";
+  const label = defaultLabel(bundleHash);
   return { label, full: `${label}.${parent}` };
 }
 
@@ -189,10 +220,49 @@ export async function publishToEns(input: EnsPublishInput): Promise<EnsPublishRe
   try {
     const wallet = walletClient();
     const pc = publicClient();
-    const { label, full } = buildSubname(input.bundleHash);
-    const node = namehash(full);
     const parentName = e.ENS_PARENT_NAME ?? "realityproof.eth";
     const parentNode = namehash(parentName);
+
+    // Resolve the actual label we'll write. Skip the collision RPC for the
+    // default vin- form — bundleHash is unique on-chain and the contract
+    // rejects duplicate mints with DuplicateBundle anyway, so paying ~500ms
+    // for a check that can't fail is wasted latency.
+    const desired = buildDesiredSubname(input.bundleHash, input.label, parentName);
+    let chosenLabel = desired.label;
+
+    if (desired.userSupplied) {
+      const desiredNode = namehash(desired.full);
+      const exists = (await pc.readContract({
+        address: ENS_REGISTRY_SEPOLIA,
+        abi: ENS_REGISTRY_ABI,
+        functionName: "recordExists",
+        args: [desiredNode],
+      })) as boolean;
+
+      if (exists) {
+        // Collision: append a 6-hex suffix from the bundle hash (deterministic
+        // per-mint disambiguator). If even THAT is taken, give up on the
+        // user's label and use the always-unique vin- form.
+        const suffix = input.bundleHash.replace(/^0x/, "").slice(0, 6).toLowerCase();
+        const fallbackLabel = `${desired.label}-${suffix}`;
+        const fallbackNode = namehash(`${fallbackLabel}.${parentName}`);
+        const fallbackExists = (await pc.readContract({
+          address: ENS_REGISTRY_SEPOLIA,
+          abi: ENS_REGISTRY_ABI,
+          functionName: "recordExists",
+          args: [fallbackNode],
+        })) as boolean;
+
+        chosenLabel = fallbackExists ? defaultLabel(input.bundleHash) : fallbackLabel;
+        console.log(
+          `[ens] label "${desired.label}" already taken; using "${chosenLabel}" instead`,
+        );
+      }
+    }
+
+    const label = chosenLabel;
+    const full = `${label}.${parentName}`;
+    const node = namehash(full);
 
     // Both txs are sent back-to-back without awaiting their receipts.
     // Reason: each Eth Sepolia receipt takes 12-24s and Vercel kills the
