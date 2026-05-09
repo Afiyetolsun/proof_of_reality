@@ -264,15 +264,26 @@ function base58Encode(buf: Uint8Array): string {
 }
 
 /**
- * Build a fetchable URL for a contenthash. Tries the user's VPS Bee
- * first (faster, more reliable for fresh content), falls back to the
- * public gateway.
+ * Build a same-origin URL for a contenthash. The actual fetch is
+ * proxied through /api/scene so the browser doesn't hit upstream Bee
+ * (no CORS) or get mixed-content blocked under HTTPS. Server-side
+ * we try local Bee first, then public Swarm gateway.
  */
 export function contentUrl(content: NonNullable<EnsRecord["content"]>): string {
+  return `/api/scene?proto=${content.protocol}&ref=${encodeURIComponent(content.ref)}`;
+}
+
+/**
+ * Build a direct gateway URL for "open this in a new tab" links —
+ * the proxy is for the in-page model-viewer only; sharing the raw
+ * gateway URL is fine and lets curators verify content addressing
+ * independently of our viewer infra.
+ */
+export function directContentUrl(content: NonNullable<EnsRecord["content"]>): string {
   if (content.protocol === "bzz") {
-    const local = process.env.NEXT_PUBLIC_BEE_LOCAL;
-    const gateway = process.env.NEXT_PUBLIC_SWARM_GATEWAY ?? "https://api.gateway.ethswarm.org";
-    return `${(local ?? gateway).replace(/\/$/, "")}/bzz/${content.ref}`;
+    const gateway =
+      process.env.NEXT_PUBLIC_SWARM_GATEWAY ?? "https://api.gateway.ethswarm.org";
+    return `${gateway.replace(/\/$/, "")}/bzz/${content.ref}`;
   }
   return `https://gateway.pinata.cloud/ipfs/${content.ref}`;
 }

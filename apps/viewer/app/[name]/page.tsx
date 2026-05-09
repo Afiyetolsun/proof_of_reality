@@ -19,7 +19,7 @@
 import Link from "next/link";
 import Script from "next/script";
 import { notFound } from "next/navigation";
-import { resolveEnsName, contentUrl, normalizeName } from "@/lib/ens";
+import { resolveEnsName, contentUrl, directContentUrl, normalizeName } from "@/lib/ens";
 import { getProof } from "@/lib/chain";
 import { runVerification } from "@/lib/verify";
 import { ShareButton } from "./ShareButton";
@@ -166,7 +166,7 @@ export default async function NamePage({ params }: PageProps) {
               <>
                 <dt>Storage</dt>
                 <dd>
-                  <a href={contentUrl(record.content)} target="_blank" rel="noreferrer">
+                  <a href={directContentUrl(record.content)} target="_blank" rel="noreferrer">
                     {record.content.protocol}://{record.content.ref.slice(0, 14)}… ↗
                   </a>
                 </dd>
