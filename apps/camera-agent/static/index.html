@@ -1,0 +1,438 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Scan &amp; Sign</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: system-ui, -apple-system, sans-serif; margin: 0; display: grid;
+         grid-template-columns: 360px 1fr; height: 100vh; }
+  aside { padding: 16px; border-right: 1px solid #8884; overflow: auto; }
+  main { display: flex; flex-direction: column; }
+  iframe { flex: 1; border: 0; }
+  h1 { font-size: 16px; margin: 0 0 12px; }
+  button { font-size: 14px; padding: 9px 12px; cursor: pointer;
+           border-radius: 6px; border: 1px solid #8886; background: #0001; }
+  button.photo { background: #246; color: white; border-color: #135; }
+  button.video { background: #c33; color: white; border-color: #911; }
+  button.cloud { background: #5a3; color: white; border-color: #371; }
+  button.stop { background: #f80; color: white; border-color: #c60; }
+  button:disabled { opacity: 0.4; cursor: default; }
+  .row { display: flex; align-items: center; gap: 6px; margin: 8px 0; flex-wrap: wrap; }
+  .pill { padding: 2px 8px; border-radius: 999px; font-size: 12px; background: #8884; }
+  .pill.live { background: #c33; color: white; }
+  .pill.ok { background: #1a7; color: white; }
+  .pill.bad { background: #c33; color: white; }
+  .pill.warn { background: #c80; color: white; }
+  .pill.mode-photo { background: #246; color: white; }
+  .pill.mode-video { background: #c33; color: white; }
+  .pill.mode-cloud { background: #5a3; color: white; }
+  .pill.tier-cosmic { background: #639; color: white; }
+  .pill.tier-online { background: #058; color: white; }
+  .pill.tier-space  { background: #444; color: white; border: 1px dashed #888; }
+  .scan { border: 1px solid #8884; border-radius: 8px; padding: 8px 10px;
+          margin: 8px 0; font-size: 13px; }
+  .scan code { font-size: 11px; word-break: break-all; }
+  .mac { color: #2a2; }
+  .err { color: #c33; }
+  .meta { color: #888; font-size: 11px; margin-top: 4px; }
+  a { color: inherit; }
+  hr { border: 0; border-top: 1px solid #8884; margin: 14px 0; }
+  small { color: #888; font-size: 11px; }
+  .mint { background: #1a710; padding: 6px 8px; border-radius: 6px; margin-top: 6px;
+          border: 1px solid #1a740; font-size: 12px; }
+  .mint a { color: inherit; }
+  details.opts { margin: 8px 0; }
+  details.opts summary { cursor: pointer; font-size: 12px; color: #888;
+                        user-select: none; padding: 4px 0; }
+  details.opts[open] summary { color: inherit; }
+  details.opts label { display: block; font-size: 11px; color: #888;
+                       margin: 6px 0 2px; }
+  details.opts input { width: 100%; box-sizing: border-box; padding: 6px 8px;
+                       border-radius: 4px; border: 1px solid #8886;
+                       background: #0001; color: inherit; font-size: 12px;
+                       font-family: ui-monospace, monospace; }
+  details.opts input:invalid { border-color: #c33; }
+  details.opts .hint { font-size: 10px; color: #888; margin-top: 2px; }
+</style>
+</head>
+<body>
+<aside>
+  <h1>Scan &amp; Sign</h1>
+
+  <div class="row">
+    <span class="pill" id="token">token: ?</span>
+    <span class="pill" id="backend">backend: ?</span>
+    <span class="pill" id="storage" title="Where scene files (PLY/NPZ) actually get pinned">storage: ?</span>
+    <span class="pill" id="tier" title="Best proof tier achievable right now">tier: ?</span>
+  </div>
+
+  <div class="row">
+    <button id="btn-photo" class="photo" title="Capture the current frame as a colored PLY">📷 Photo</button>
+    <button id="btn-video" class="video" title="Record a stream of (color, depth) frames">🎥 Video</button>
+    <button id="btn-cloud" class="cloud" title="Run RGB-D SLAM and merge into one point cloud">🌐 Cloud</button>
+  </div>
+  <div class="row">
+    <button id="btn-stop" class="stop" disabled>⏹ Stop &amp; sign</button>
+    <span class="pill" id="state">idle</span>
+    <span id="elapsed"></span>
+    <span id="frames"></span>
+  </div>
+  <small id="hint">Photo = single frame · Video = .npz frame stream · Cloud = TSDF SLAM merge</small>
+
+  <details class="opts" id="mint-opts">
+    <summary>Mint options &mdash; ENS label, recipient (optional)</summary>
+    <label for="opt-label">ENS label (3-32 chars, a-z 0-9 -)</label>
+    <input id="opt-label" type="text" maxlength="32" autocomplete="off"
+           pattern="[a-z0-9](-?[a-z0-9])+"
+           placeholder="my-scan (auto vin-… if blank)">
+    <div class="hint" id="opt-label-hint">backend defaults to <code>vin-&lt;hash&gt;.realityproof.eth</code></div>
+
+    <label for="opt-recipient">Recipient wallet (0x… 40 hex)</label>
+    <input id="opt-recipient" type="text" autocomplete="off" spellcheck="false"
+           pattern="0x[0-9a-fA-F]{40}"
+           placeholder="leave blank to mint to backend minter">
+    <div class="hint">Leave blank to use the backend's default minter address.</div>
+  </details>
+
+  <div class="row">
+    <a id="vizlink" href="#" target="_blank" rel="noopener">Open live preview &#8599;</a>
+  </div>
+
+  <hr>
+  <div id="scans"></div>
+</aside>
+<main id="vizmain"></main>
+<script>
+const $ = (id) => document.getElementById(id);
+
+function vizUrlFromConfig(c) {
+  if (c && c.viz_url) return c.viz_url;
+  const port = (c && c.viz_port) || 8082;
+  return `${location.protocol}//${location.hostname}:${port}/`;
+}
+
+(async () => {
+  let url = `${location.protocol}//${location.hostname}:8082/`;
+  try {
+    const r = await fetch('/config');
+    url = vizUrlFromConfig(await r.json());
+  } catch {}
+  $('vizlink').href = url;
+
+  const sameOrigin = url.startsWith(location.protocol);
+  if (sameOrigin) {
+    const iframe = document.createElement('iframe');
+    iframe.src = url;
+    iframe.style.cssText = 'flex:1;border:0;width:100%;height:100%';
+    $('vizmain').appendChild(iframe);
+  } else {
+    $('vizmain').innerHTML =
+      `<div style="margin:auto;text-align:center;color:#888;padding:40px;font-size:14px;line-height:1.5">
+         Live preview is on a different origin (${url}).<br>
+         Open it in a new tab using the link in the sidebar.
+       </div>`;
+    $('vizmain').style.display = 'flex';
+  }
+})();
+
+function setRecordingButtons(state) {
+  const recording = !!state.recording;
+  ['btn-photo', 'btn-video', 'btn-cloud'].forEach(id => {
+    $(id).disabled = recording;
+  });
+  $('btn-stop').disabled = !recording;
+}
+
+async function refreshState() {
+  try {
+    const r = await fetch('/record/state');
+    const s = await r.json();
+    setRecordingButtons(s);
+    if (s.recording) {
+      $('state').textContent = `${s.mode} · ${s.scan_id}`;
+      $('state').className = 'pill mode-' + s.mode;
+    } else {
+      $('state').textContent = 'idle';
+      $('state').className = 'pill';
+    }
+    $('elapsed').textContent = s.recording ? `${s.elapsed_s}s` : '';
+    $('frames').textContent = s.recording ? `${s.frame_count} frames` : '';
+  } catch {}
+}
+
+function tierFamily(label) {
+  // 'cosmic+token' / 'online' / 'space+token' → 'cosmic' / 'online' / 'space'
+  return (label || '').split('+')[0] || 'space';
+}
+
+async function refreshHealth() {
+  try {
+    const r = await fetch('/healthz');
+    const h = await r.json();
+    const t = $('token');
+    t.textContent = `token: ${h.token.connected ? 'connected' : 'disconnected'}`;
+    t.className = `pill ${h.token.connected ? 'ok' : 'bad'}`;
+    t.title = h.token.msg;
+
+    const b = $('backend');
+    if (h.backend.url === null) {
+      b.textContent = 'backend: disabled';
+      b.className = 'pill warn';
+    } else {
+      b.textContent = `backend: ${h.backend.ok ? 'ok' : 'down'}`;
+      b.className = `pill ${h.backend.ok ? 'ok' : 'bad'}`;
+    }
+    b.title = h.backend.msg;
+
+    // Storage pill: warn loudly when scenes >4MB will silently downgrade
+    // to local:<sha> (i.e. won't actually be pinned anywhere).
+    const s = $('storage');
+    const storage = h.backend?.storage || 'none';
+    if (storage === 'swarm') {
+      s.textContent = 'storage: swarm';
+      s.className = 'pill ok';
+      s.title = 'Scenes go directly to your Bee node — no size cap.';
+    } else if (storage === 'ipfs') {
+      s.textContent = 'storage: ipfs';
+      s.className = 'pill ok';
+      s.title = 'Scenes go directly to Pinata IPFS — no size cap.';
+    } else if (h.backend.url === null) {
+      s.textContent = 'storage: n/a';
+      s.className = 'pill';
+      s.title = 'Backend disabled.';
+    } else {
+      s.textContent = 'storage: api-only';
+      s.className = 'pill warn';
+      s.title = 'No direct-storage credentials configured. Scenes >4MB '
+              + 'will be referenced by hash only (local:<sha>) and not '
+              + 'pinned to any IPFS/Swarm. Set BEE_URL+SWARM_POSTAGE_BATCH_ID '
+              + 'or PINATA_JWT on the OAK device to enable scene pinning.';
+    }
+
+    const tier = $('tier');
+    const tlabel = h.tier?.label || 'space';
+    const tfam = tierFamily(tlabel);
+    tier.textContent = `tier: ${tlabel}`;
+    tier.className = `pill tier-${tfam}`;
+    tier.title = `nonce: ${h.tier?.nonce_source || '?'} · attestation: ${h.tier?.attestation || '?'}`;
+  } catch {}
+}
+
+const OPTS_KEY = 'oak.mint.opts.v1';
+
+function loadOpts() {
+  try {
+    const raw = localStorage.getItem(OPTS_KEY);
+    if (!raw) return {};
+    return JSON.parse(raw) || {};
+  } catch { return {}; }
+}
+
+function saveOpts(o) {
+  try { localStorage.setItem(OPTS_KEY, JSON.stringify(o)); } catch {}
+}
+
+function readOptsFromForm() {
+  const label = ($('opt-label').value || '').trim().toLowerCase();
+  const recipient = ($('opt-recipient').value || '').trim();
+  // Mirror backend's regex (3-32, alnum start+end, single-hyphen separators).
+  const labelOk = !label || /^[a-z0-9](-?[a-z0-9]){2,31}$/.test(label);
+  const recipientOk = !recipient || /^0x[0-9a-fA-F]{40}$/.test(recipient);
+  return { label: labelOk ? (label || undefined) : null,
+           recipient: recipientOk ? (recipient || undefined) : null,
+           labelOk, recipientOk };
+}
+
+function currentMintOpts() {
+  const f = readOptsFromForm();
+  if (f.label === null || f.recipient === null) return null;  // invalid
+  const out = {};
+  if (f.label) out.label = f.label;
+  if (f.recipient) out.recipient = f.recipient;
+  return out;
+}
+
+function renderMint(m) {
+  if (!m || !m.txHash) return '';
+  const tx = `<a href="https://sepolia.basescan.org/tx/${m.txHash}" target="_blank">tx ${m.txHash.slice(0,10)}…</a>`;
+  const ens = m.ensName ? ` · <a href="https://sepolia.app.ens.domains/${m.ensName}" target="_blank">${m.ensName}</a>` : '';
+  const tok = m.tokenId ? ` · token #${m.tokenId}` : '';
+  return `<div class="mint">${tx}${tok}${ens}</div>`;
+}
+
+function renderTier(s) {
+  const t = s.tier;
+  if (!t || !t.label) return '';
+  const fam = tierFamily(t.label);
+  const title = `nonce: ${t.nonce_source} · attestation: ${t.attestation}`;
+  return `<span class="pill tier-${fam}" title="${title}">${t.label}</span>`;
+}
+
+function renderPending(s) {
+  if (!s.mint_pending) return '';
+  return `<div class="meta">
+    <button class="retry" data-scan="${s.scan_id}">↻ retry mint</button>
+    <span style="color:#c80">deferred (Space Mode) · re-mintable when backend is reachable</span>
+  </div>`;
+}
+
+function renderBackendErr(b) {
+  if (!b) return '';
+  if (b.error) return `<div class="err meta">backend: ${b.error}</div>`;
+  if (b.nonce_error) return `<div class="err meta">nonce: ${b.nonce_error}</div>`;
+  return '';
+}
+
+function fmtPts(n) {
+  return (n == null) ? '—' : Number(n).toLocaleString();
+}
+
+function modePill(mode) {
+  const cls = mode ? `pill mode-${mode}` : 'pill';
+  return `<span class="${cls}">${mode || '?'}</span>`;
+}
+
+async function refreshScans() {
+  const r = await fetch('/scans');
+  const items = await r.json();
+  const html = items.map(s => {
+    const g = s.gotee || {};
+    const macHtml = g.mac
+      ? `<span class="mac">mac ${g.mac.slice(0,16)}…</span>`
+      : g.error
+        ? `<span class="err">sign failed: ${g.error}</span>`
+        : `<span class="err">unsigned</span>`;
+    const frames = s.frames_integrated ?? s.frame_count ?? '—';
+    const pts = fmtPts(s.point_count);
+    const sha = s.artifact_sha256 || s.ply_sha256 || '';
+    const artifact = s.artifact || `${s.scan_id}.ply`;
+    const bundleHash = s.bundle_hash
+      ? `<div class="meta"><code>bundle ${s.bundle_hash.slice(0,18)}…</code></div>`
+      : '';
+    const bundleLink = s.bundle_hash
+      ? ` · <a href="/scans/${s.scan_id}.bundle.json" target="_blank">bundle</a>`
+      : '';
+    return `<div class="scan">
+      <div>${modePill(s.mode)} ${renderTier(s)} <strong>${s.scan_id}</strong> &nbsp; ${macHtml}</div>
+      <div class="meta">
+        ${pts} pts ·
+        ${frames} frames ·
+        ${s.duration_s}s
+        ${g.device_id ? '· dev '+g.device_id : ''}
+      </div>
+      <div class="meta">
+        <code>sha256 ${sha}</code>
+      </div>
+      ${bundleHash}
+      ${renderMint(s.mint)}
+      ${renderPending(s)}
+      ${renderBackendErr(s.backend)}
+      <div class="meta">
+        <a href="/scans/${artifact}" download>${artifact.split('.').pop().toUpperCase()}</a> ·
+        ${s.mesh_artifact ? `<a href="/scans/${s.mesh_artifact}" download>MESH</a> · ` : ''}
+        ${s.poisson_artifact ? `<a href="/scans/${s.poisson_artifact}" download>POISSON</a> · ` : ''}
+        <a href="/scans/${s.scan_id}.json" target="_blank">envelope</a>
+      </div>
+    </div>`;
+  }).join('') || '<div style="color:#888;font-size:13px">no scans yet</div>';
+  $('scans').innerHTML = html;
+}
+
+function postWithOpts(url) {
+  const opts = currentMintOpts();
+  if (opts === null) {
+    alert('Mint options invalid — fix the highlighted field or clear it.');
+    return Promise.resolve(null);
+  }
+  return fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(opts),
+  });
+}
+
+async function startRecording(mode) {
+  // /record/start doesn't mint — opts are sent at /record/stop time. Keep
+  // this call body-less so we don't 400 on backends that don't expect one.
+  const r = await fetch(`/record/start/${mode}`, { method: 'POST' });
+  if (!r.ok) {
+    const t = await r.text();
+    alert(`start ${mode} failed: ${t}`);
+  }
+  refreshState();
+}
+
+async function takePhoto() {
+  ['btn-photo','btn-video','btn-cloud'].forEach(id => $(id).disabled = true);
+  try {
+    const r = await postWithOpts('/capture/photo');
+    if (r && !r.ok) {
+      const t = await r.text();
+      alert(`photo failed: ${t}`);
+    }
+  } finally {
+    refreshState();
+    refreshScans();
+  }
+}
+
+async function stopRecording() {
+  $('btn-stop').disabled = true;
+  $('btn-stop').textContent = '⏳ signing…';
+  try { await postWithOpts('/record/stop'); } catch {}
+  $('btn-stop').textContent = '⏹ Stop & sign';
+  refreshState();
+  refreshScans();
+}
+
+async function retryMint(scanId, btn) {
+  btn.disabled = true;
+  const orig = btn.textContent;
+  btn.textContent = '⏳ retrying…';
+  try {
+    const r = await postWithOpts(`/retry-mint/${encodeURIComponent(scanId)}`);
+    if (r && !r.ok) {
+      const t = await r.text();
+      alert(`retry failed: ${t}`);
+    }
+  } finally {
+    btn.textContent = orig;
+    refreshScans();
+  }
+}
+
+$('btn-photo').onclick = takePhoto;
+$('btn-video').onclick = () => startRecording('video');
+$('btn-cloud').onclick = () => startRecording('cloud');
+$('btn-stop').onclick = stopRecording;
+
+// Restore persisted mint options + persist on every edit.
+(function initOpts() {
+  const saved = loadOpts();
+  if (saved.label) $('opt-label').value = saved.label;
+  if (saved.recipient) $('opt-recipient').value = saved.recipient;
+  // Open the section if anything is set, so the user sees the active overrides.
+  if (saved.label || saved.recipient) $('mint-opts').open = true;
+  const persist = () => {
+    const f = readOptsFromForm();
+    saveOpts({ label: f.label || '', recipient: f.recipient || '' });
+  };
+  ['opt-label','opt-recipient'].forEach(id => $(id).addEventListener('input', persist));
+})();
+
+// Event-delegate the dynamically-rendered retry buttons in the scans list.
+$('scans').addEventListener('click', (ev) => {
+  const t = ev.target.closest('button.retry');
+  if (t) retryMint(t.dataset.scan, t);
+});
+
+setInterval(refreshState, 500);
+setInterval(refreshHealth, 2500);
+setInterval(refreshScans, 3000);
+refreshState();
+refreshHealth();
+refreshScans();
+</script>
+</body>
+</html>

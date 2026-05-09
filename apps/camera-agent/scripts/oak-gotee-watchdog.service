@@ -1,0 +1,9 @@
+[Unit]
+Description=GoTEE forwarder watchdog (probe + auto-recover)
+After=oak-gotee.service
+
+[Service]
+Type=oneshot
+ExecStart=/var/lib/oak-gotee/watchdog.sh
+# StandardOutput goes to journal by default; the script logs via `logger`
+# so its output shows up under the oak-gotee-watchdog tag too.

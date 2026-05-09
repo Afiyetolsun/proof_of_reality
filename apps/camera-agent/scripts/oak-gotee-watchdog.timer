@@ -1,0 +1,14 @@
+[Unit]
+Description=Run oak-gotee-watchdog every 30 seconds
+
+[Timer]
+# Wait a minute after boot so usb0 and the forwarder have time to
+# settle before we start probing — otherwise the first few cycles
+# would always fail and burn the fail counter on a non-issue.
+OnBootSec=60
+OnUnitActiveSec=30
+Unit=oak-gotee-watchdog.service
+AccuracySec=5
+
+[Install]
+WantedBy=timers.target
