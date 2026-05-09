@@ -34,7 +34,8 @@ export function CookieBanner() {
     <div
       role="dialog"
       aria-label="Cookie consent"
-      className="fixed bottom-0 left-0 right-0 z-50 border-t border-[--color-rule] bg-[--color-surface-raised] px-4 py-5 md:px-8"
+      className="fixed bottom-0 left-0 right-0 z-50 border-t border-[--color-rule] px-4 py-5 md:px-8"
+      style={{ backgroundColor: "oklch(0.21 0.014 250)" }}
     >
       <div className="container-page flex flex-col items-start gap-4 md:flex-row md:items-center md:justify-between">
         <p className="text-body-s text-[--color-ink-mute] max-w-prose">
