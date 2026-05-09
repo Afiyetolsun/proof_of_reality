@@ -29,7 +29,7 @@ export function Card({ record }: { record: SubnameRecord }) {
           />
         </Link>
 
-        {sceneUrl && <CardScene url={sceneUrl} />}
+        {sceneUrl && <CardScene url={sceneUrl} detailHref={viewerHref} />}
 
         {/* Top-right pills: mode + token (sit above CardScene's play button) */}
         <div className="pointer-events-none absolute right-3 top-3 z-30 flex flex-col items-end gap-2">
