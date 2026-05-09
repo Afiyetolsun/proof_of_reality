@@ -38,8 +38,13 @@ def parse_args():
                    help="TSDF voxel length in metres (cloud mode)")
     p.add_argument("--sdf-trunc", type=float, default=0.06,
                    help="TSDF truncation distance in metres (cloud mode)")
-    p.add_argument("--depth-max", type=float, default=5.0,
-                   help="Drop depths beyond this (metres)")
+    p.add_argument("--depth-max", type=float, default=2.0,
+                   help="Drop depths beyond this (metres). Tighter values "
+                        "(1.5-2.5 m) keep the cloud focused on close "
+                        "objects, reduce far-field stereo noise (precision "
+                        "scales as z^2), and stabilise odometry by "
+                        "rejecting unreliable far features. Raise for "
+                        "whole-room or outdoor capture.")
     p.add_argument("--video-max-frames", type=int, default=600,
                    help="Hard cap on video-mode frames to bound RAM use")
     a = p.parse_args()
