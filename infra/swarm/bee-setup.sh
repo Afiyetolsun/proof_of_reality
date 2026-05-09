@@ -31,21 +31,50 @@ case "$cmd" in
     peers=$(curl -fsS "$BEE_API/peers" 2>/dev/null | grep -oc '"address"' || echo 0)
     echo "  peers:   $peers"
 
+    node=$(curl -fsS "$BEE_API/node" 2>/dev/null || echo "{}")
+    cbenabled=$(echo "$node" | grep -o '"chequebookEnabled":[a-z]*' | cut -d':' -f2 || echo unknown)
+    echo "  chequebook: $cbenabled"
+
     if [[ -n "${eth:-}" ]]; then
-      cb=$(curl -fsS "$BEE_API/chequebook/balance" 2>/dev/null || echo "{}")
-      bzz=$(echo "$cb" | grep -o '"availableBalance":"[^"]*"' | cut -d'"' -f4 || echo 0)
-      bal=$(curl -fsS "$BEE_API/wallet" 2>/dev/null || echo "{}")
-      xdai=$(echo "$bal" | grep -o '"nativeTokenBalance":"[^"]*"' | cut -d'"' -f4 || echo 0)
-      bzzraw=$(echo "$bal" | grep -o '"bzzBalance":"[^"]*"' | cut -d'"' -f4 || echo 0)
-      echo "  xDAI:    $xdai (raw wei)"
-      echo "  xBZZ:    $bzzraw (raw, 16 decimals)"
-      echo "  cheque:  $bzz (raw, available)"
-      echo
-      echo "Fund this address on Gnosis Chain (chainID 100):"
-      echo "  $eth"
-      echo "  → ~0.05 xDAI for gas"
-      echo "  → ~0.5 xBZZ for the stamp"
+      # Portable body+code split (head -n -1 isn't on macOS).
+      bal_body=$(curl -sS -o /dev/stdout -w "" "$BEE_API/wallet" 2>/dev/null || echo "")
+      bal_code=$(curl -sS -o /dev/null -w "%{http_code}" "$BEE_API/wallet" 2>/dev/null || echo 000)
+      if [[ "$bal_code" == "503" ]]; then
+        echo
+        echo "  ⏳ /wallet, /chequebook, /stamps are 503 because Bee is still"
+        echo "     downloading the postage snapshot (one-time, 5-20 min)."
+        echo "     Funding has landed (check the explorer); these queries unblock"
+        echo "     once sync completes. Watch progress with:"
+        echo "       ./bee-setup.sh logs"
+        echo
+        echo "  Explorer:"
+        echo "  https://gnosisscan.io/address/$eth"
+      else
+        # Sync done — endpoints are live.
+        # The /wallet response field names changed across Bee versions; try both.
+        xdai=$(echo "$bal_body" | grep -o '"nativeTokenBalance":"[^"]*"' | cut -d'"' -f4)
+        xdai=${xdai:-$(echo "$bal_body" | grep -o '"xDaiBalance":"[^"]*"' | cut -d'"' -f4)}
+        bzz=$(echo "$bal_body" | grep -o '"bzzBalance":"[^"]*"' | cut -d'"' -f4)
+        cb=$(curl -fsS "$BEE_API/chequebook/balance" 2>/dev/null || echo "{}")
+        cbal=$(echo "$cb" | grep -o '"availableBalance":"[^"]*"' | cut -d'"' -f4)
+        echo "  xDAI:    ${xdai:-?} (raw wei)"
+        echo "  xBZZ:    ${bzz:-?} (raw, 16 decimals)"
+        echo "  cheque:  ${cbal:-?} (raw, available)"
+        echo
+        if [[ -z "$xdai" || "$xdai" == "0" ]]; then
+          echo "Fund this address on Gnosis Chain (chainID 100):"
+          echo "  $eth"
+          echo "  → ~0.05 xDAI for gas"
+          echo "  → ~0.5 xBZZ for the stamp"
+        else
+          echo "✅ Ready to buy a stamp:  ./bee-setup.sh stamp"
+        fi
+      fi
     fi
+    ;;
+
+  logs)
+    docker compose logs -f bee
     ;;
 
   stamp)
@@ -89,7 +118,7 @@ case "$cmd" in
     ;;
 
   *)
-    echo "usage: $0 {status|stamp|stamps|upload <file>}"
+    echo "usage: $0 {status|stamp|stamps|upload <file>|logs}"
     exit 1
     ;;
 esac

@@ -21,7 +21,7 @@
 
 services:
   bee:
-    image: ethersphere/bee:2.3.2
+    image: ethersphere/bee:latest
     container_name: po-bee
     restart: unless-stopped
     command: ["start"]
@@ -47,9 +47,12 @@ services:
       # Gnosis Chain endpoints (Bee uses this for chequebook + postage txs)
       BEE_BLOCKCHAIN_RPC_ENDPOINT: "${BEE_BLOCKCHAIN_RPC_ENDPOINT:-https://rpc.gnosis.gateway.fm}"
 
-      # Persist postage stamps across restarts (default true on 2.x but
-      # explicit for clarity)
-      BEE_USE_POSTAGE_SNAPSHOT: "true"
+      # Skip the postage snapshot bootstrap. The snapshot fetch needs
+      # peers immediately and 1-min times out on a fresh node — turning
+      # it off lets Bee build postage state directly from chain events
+      # so it doesn't crash-loop while looking for peers. We don't need
+      # to query other people's stamps anyway, only mint + use our own.
+      BEE_USE_POSTAGE_SNAPSHOT: "false"
 
       # Logs
       BEE_VERBOSITY: "info"
