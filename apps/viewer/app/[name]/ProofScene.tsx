@@ -2,6 +2,7 @@
 
 import Script from "next/script";
 import { useEffect, useState } from "react";
+import { UsdzCanvas } from "./UsdzCanvas";
 
 interface Props {
   url: string;
@@ -140,11 +141,13 @@ function GlbCard({ url, attestor }: { url: string; attestor?: string }) {
 }
 
 /**
- * USDZ preview. model-viewer's WebGL renderer can't read USDZ; the
- * format is Apple-specific and only QuickLook (iOS / iPadOS / macOS
- * Finder) renders it directly. Rather than show a broken black
- * canvas, give the user a clean call-to-action that does the right
- * thing per platform.
+ * USDZ preview. Renders the Apple-native format directly in browser
+ * via three.js's USDZLoader (wrapped by three-usdz-loader). Beats
+ * the black-canvas / QuickLook-only fallback we had before — judges
+ * see the model spinning in their browser without leaving the tab.
+ *
+ * Keeps the AR button as a secondary action since it triggers Apple
+ * QuickLook on iPhone/iPad with the full-fidelity native renderer.
  */
 function UsdzCard({ url, attestor }: { url: string; attestor?: string }) {
   const isApple =
@@ -152,39 +155,38 @@ function UsdzCard({ url, attestor }: { url: string; attestor?: string }) {
     /iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent);
 
   return (
-    <section
-      className="scene-card"
-      style={{
-        background:
-          "linear-gradient(135deg, rgba(110,231,183,0.06), rgba(110,231,183,0.01))",
-        padding: 32,
-        textAlign: "center",
-      }}
-    >
-      <div style={{ fontSize: 48, marginBottom: 12 }}>📦</div>
-      <h3 style={{ margin: "0 0 6px", fontSize: 18 }}>USDZ scene</h3>
-      <p className="muted" style={{ margin: "0 auto 20px", maxWidth: 380 }}>
-        {isApple
-          ? "Tap below to open the 3D capture in Apple QuickLook — orbit, scale, and place in your room with AR."
-          : "USDZ is an Apple-native format. Open on an iPhone / iPad / Mac to view in QuickLook, or download the file directly."}
-      </p>
-      <a
-        href={url}
-        rel="ar"
-        download
+    <section className="scene-card">
+      <UsdzCanvas url={url} />
+      <div
         style={{
-          display: "inline-block",
-          background: "var(--accent)",
-          color: "var(--accent-fg)",
-          padding: "12px 24px",
-          borderRadius: 999,
-          textDecoration: "none",
-          fontWeight: 600,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginTop: 12,
+          gap: 12,
         }}
       >
-        {isApple ? "Open in QuickLook" : "Download .usdz"}
-      </a>
-      <Caption attestor={attestor} />
+        <Caption attestor={attestor} />
+        {isApple && (
+          <a
+            href={url}
+            rel="ar"
+            style={{
+              display: "inline-block",
+              background: "var(--accent)",
+              color: "var(--accent-fg)",
+              padding: "8px 16px",
+              borderRadius: 999,
+              textDecoration: "none",
+              fontWeight: 600,
+              fontSize: 13,
+              whiteSpace: "nowrap",
+            }}
+          >
+            View in AR
+          </a>
+        )}
+      </div>
     </section>
   );
 }

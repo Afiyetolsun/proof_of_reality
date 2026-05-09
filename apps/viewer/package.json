@@ -11,13 +11,16 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@proof-of-reality/proof-bundle": "workspace:*",
     "@proof-of-reality/attestation": "workspace:*",
     "@proof-of-reality/contracts-abi": "workspace:*",
+    "@proof-of-reality/proof-bundle": "workspace:*",
     "@proof-of-reality/verified-swarm-fetch": "workspace:*",
+    "@types/three": "^0.165.0",
     "next": "^15.0.3",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "three": "^0.166.1",
+    "three-usdz-loader": "^1.0.9",
     "viem": "^2.21.45"
   },
   "devDependencies": {
