@@ -20,6 +20,8 @@ try {
 } catch {}
 
 import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { basename, extname } from "node:path";
 
 const API_URL = process.env.SMOKE_API_URL ?? "http://localhost:4000";
 const SECRET = process.env.IOS_SHARED_SECRET;
@@ -48,9 +50,23 @@ const nonce = (await nonceRes.json()) as {
 console.log(`  ok — nonce=${nonce.nonce.slice(0, 18)}…  src=${nonce.src}  satSig=${nonce.satSig || "(empty)"}`);
 
 // ---- 2. build iOS-shaped bundle JSON (matches voxelio_web3/ProofBundle.swift) ----
+// SCENE_FILE=/path/to/file.usdz overrides the synthetic 256-byte stub, so
+// you can demo the full pipeline against a real 3D asset (judges open the
+// avatar/contenthash URL in the ENS app and see an actual model).
 const now = Math.floor(Date.now() / 1000);
-const sceneBytes = new Uint8Array(256);
-sceneBytes.set([0x67, 0x6c, 0x62, 0x00], 0); // pseudo-GLB magic
+
+let sceneBytes: Uint8Array;
+let sceneName: string;
+if (process.env.SCENE_FILE) {
+  const buf = readFileSync(process.env.SCENE_FILE);
+  sceneBytes = new Uint8Array(buf);
+  sceneName = basename(process.env.SCENE_FILE);
+  console.log(`  scene: ${sceneName} (${sceneBytes.byteLength} bytes from ${process.env.SCENE_FILE})`);
+} else {
+  sceneBytes = new Uint8Array(256);
+  sceneBytes.set([0x67, 0x6c, 0x62, 0x00], 0); // pseudo-GLB magic
+  sceneName = "scene.glb";
+}
 const sceneSha = createHash("sha256").update(sceneBytes).digest("hex");
 
 const bundle = {
@@ -60,7 +76,7 @@ const bundle = {
   nonce: nonce.nonce,
   satSig: nonce.satSig,
   nonceExpiresAt: nonce.expiresAt,
-  scene: { name: "scene.glb", sha256: sceneSha, bytes: sceneBytes.byteLength },
+  scene: { name: sceneName, sha256: sceneSha, bytes: sceneBytes.byteLength },
   audio: null,
   sensorsHash: createHash("sha256").update("smoke-test-sensors").digest("hex"),
   device: {
@@ -95,7 +111,16 @@ console.log(`  bundle SHA-256 (iOS-equiv): ${expectedHash.slice(0, 18)}…`);
 console.log("→ POST /api/upload");
 const fd = new FormData();
 fd.append("bundle", new Blob([bundleBytes], { type: "application/json" }), "bundle.json");
-fd.append("scene", new Blob([sceneBytes], { type: "model/vnd.usdz+zip" }), bundle.scene.name);
+// Mime-type the scene blob by extension so backends/CDNs serve it
+// correctly when the avatar URL is opened directly in QuickLook.
+const mimeForExt: Record<string, string> = {
+  ".usdz": "model/vnd.usdz+zip",
+  ".glb": "model/gltf-binary",
+  ".gltf": "model/gltf+json",
+  ".obj": "text/plain",
+};
+const sceneMime = mimeForExt[extname(bundle.scene.name).toLowerCase()] ?? "application/octet-stream";
+fd.append("scene", new Blob([sceneBytes], { type: sceneMime }), bundle.scene.name);
 const uploadRes = await fetch(`${API_URL}/api/upload`, {
   method: "POST",
   headers: auth,
