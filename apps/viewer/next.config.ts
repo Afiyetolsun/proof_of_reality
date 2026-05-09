@@ -34,7 +34,9 @@ const config: NextConfig = {
         headers: [{ key: "Cross-Origin-Resource-Policy", value: "same-origin" }],
       },
       {
-        source: "/usd/:file*",
+        // Pixar USD WASM bundle, served at root because emHdBindings.js
+        // fetches the .wasm via relative URL.
+        source: "/emHdBindings.:ext(wasm|js|data|worker.js)",
         headers: [{ key: "Cross-Origin-Resource-Policy", value: "same-origin" }],
       },
       {

@@ -73,14 +73,18 @@ export function UsdzCanvas({ url }: Props) {
     controls.maxDistance = 50;
 
     // ---- 4. Load the USDZ ----
-    // Pixar's USD compiled to WASM (via three-usdz-loader). Handles
-    // the full USD spec — works on every USDZ I've thrown at it,
-    // including ones three.js's pure-JS USDZLoader chokes on.
+    // Pixar's USD compiled to WASM (via three-usdz-loader).
     //
-    // WASM bundle is in /public/usd/, served same-origin under our
-    // COOP+COEP isolated /<name> route so SharedArrayBuffer works.
-    // The loader auto-finds the WASM relative to the page origin.
-    const loader = new USDZLoader("/usd");
+    // WASM bundle MUST be at /public root — emHdBindings.js fetches
+    // "emHdBindings.wasm" as a *relative URL*, which resolves against
+    // the document base (/<ens-name>) to `/emHdBindings.wasm`. If we
+    // put it under /usd/, the wasm-instantiate dependency hangs
+    // forever waiting for a 404.
+    //
+    // The constructor's depDirectory arg ("") is only used for the
+    // .data file's REMOTE_PACKAGE_BASE — we pass empty so it also
+    // resolves at root, matching where we put the .wasm.
+    const loader = new USDZLoader("");
     const groupHolder = new THREE.Group();
     scene.add(groupHolder);
 

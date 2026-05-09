@@ -36,9 +36,9 @@ export const config = {
   // /model-viewer.min.js, etc.
   matcher: [
     // Negative lookahead avoids: API + Next internals + token redirect
-    // route + USD WASM + the model-viewer script + any *static asset*
-    // file extension. We can't simply exclude all paths-with-dots
-    // because ENS names look like vin-….realityproof.eth.
-    "/((?!api/|_next/|token/|usd/|model-viewer|favicon|.*\\.(?:ico|svg|png|jpg|jpeg|gif|webp|css|js|json|txt|xml|woff|woff2|map|webmanifest)$).*)",
+    // route + the model-viewer script + Pixar USD WASM bundle + any
+    // *static asset* file extension. We can't simply exclude all
+    // paths-with-dots because ENS names look like vin-….realityproof.eth.
+    "/((?!api/|_next/|token/|model-viewer|emHdBindings|favicon|.*\\.(?:ico|svg|png|jpg|jpeg|gif|webp|css|js|json|txt|xml|woff|woff2|wasm|data|map|webmanifest)$).*)",
   ],
 };
