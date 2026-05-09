@@ -27,6 +27,9 @@
   .pill.mode-photo { background: #246; color: white; }
   .pill.mode-video { background: #c33; color: white; }
   .pill.mode-cloud { background: #5a3; color: white; }
+  .pill.tier-cosmic { background: #639; color: white; }
+  .pill.tier-online { background: #058; color: white; }
+  .pill.tier-space  { background: #444; color: white; border: 1px dashed #888; }
   .scan { border: 1px solid #8884; border-radius: 8px; padding: 8px 10px;
           margin: 8px 0; font-size: 13px; }
   .scan code { font-size: 11px; word-break: break-all; }
@@ -48,6 +51,7 @@
   <div class="row">
     <span class="pill" id="token">token: ?</span>
     <span class="pill" id="backend">backend: ?</span>
+    <span class="pill" id="tier" title="Best proof tier achievable right now">tier: ?</span>
   </div>
 
   <div class="row">
@@ -129,6 +133,11 @@ async function refreshState() {
   } catch {}
 }
 
+function tierFamily(label) {
+  // 'cosmic+token' / 'online' / 'space+token' → 'cosmic' / 'online' / 'space'
+  return (label || '').split('+')[0] || 'space';
+}
+
 async function refreshHealth() {
   try {
     const r = await fetch('/healthz');
@@ -147,6 +156,13 @@ async function refreshHealth() {
       b.className = `pill ${h.backend.ok ? 'ok' : 'bad'}`;
     }
     b.title = h.backend.msg;
+
+    const tier = $('tier');
+    const tlabel = h.tier?.label || 'space';
+    const tfam = tierFamily(tlabel);
+    tier.textContent = `tier: ${tlabel}`;
+    tier.className = `pill tier-${tfam}`;
+    tier.title = `nonce: ${h.tier?.nonce_source || '?'} · attestation: ${h.tier?.attestation || '?'}`;
   } catch {}
 }
 
@@ -156,6 +172,22 @@ function renderMint(m) {
   const ens = m.ensName ? ` · <a href="https://sepolia.app.ens.domains/${m.ensName}" target="_blank">${m.ensName}</a>` : '';
   const tok = m.tokenId ? ` · token #${m.tokenId}` : '';
   return `<div class="mint">${tx}${tok}${ens}</div>`;
+}
+
+function renderTier(s) {
+  const t = s.tier;
+  if (!t || !t.label) return '';
+  const fam = tierFamily(t.label);
+  const title = `nonce: ${t.nonce_source} · attestation: ${t.attestation}`;
+  return `<span class="pill tier-${fam}" title="${title}">${t.label}</span>`;
+}
+
+function renderPending(s) {
+  if (!s.mint_pending) return '';
+  return `<div class="meta">
+    <button class="retry" data-scan="${s.scan_id}">↻ retry mint</button>
+    <span style="color:#c80">deferred (Space Mode) · re-mintable when backend is reachable</span>
+  </div>`;
 }
 
 function renderBackendErr(b) {
@@ -195,7 +227,7 @@ async function refreshScans() {
       ? ` · <a href="/scans/${s.scan_id}.bundle.json" target="_blank">bundle</a>`
       : '';
     return `<div class="scan">
-      <div>${modePill(s.mode)} <strong>${s.scan_id}</strong> &nbsp; ${macHtml}</div>
+      <div>${modePill(s.mode)} ${renderTier(s)} <strong>${s.scan_id}</strong> &nbsp; ${macHtml}</div>
       <div class="meta">
         ${pts} pts ·
         ${frames} frames ·
@@ -207,6 +239,7 @@ async function refreshScans() {
       </div>
       ${bundleHash}
       ${renderMint(s.mint)}
+      ${renderPending(s)}
       ${renderBackendErr(s.backend)}
       <div class="meta">
         <a href="/scans/${artifact}" download>${artifact.split('.').pop().toUpperCase()}</a> ·
@@ -249,10 +282,32 @@ async function stopRecording() {
   refreshScans();
 }
 
+async function retryMint(scanId, btn) {
+  btn.disabled = true;
+  const orig = btn.textContent;
+  btn.textContent = '⏳ retrying…';
+  try {
+    const r = await fetch(`/retry-mint/${encodeURIComponent(scanId)}`, { method: 'POST' });
+    if (!r.ok) {
+      const t = await r.text();
+      alert(`retry failed: ${t}`);
+    }
+  } finally {
+    btn.textContent = orig;
+    refreshScans();
+  }
+}
+
 $('btn-photo').onclick = takePhoto;
 $('btn-video').onclick = () => startRecording('video');
 $('btn-cloud').onclick = () => startRecording('cloud');
 $('btn-stop').onclick = stopRecording;
+
+// Event-delegate the dynamically-rendered retry buttons in the scans list.
+$('scans').addEventListener('click', (ev) => {
+  const t = ev.target.closest('button.retry');
+  if (t) retryMint(t.dataset.scan, t);
+});
 
 setInterval(refreshState, 500);
 setInterval(refreshHealth, 2500);
