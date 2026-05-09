@@ -1,9 +1,18 @@
 #!/usr/bin/env bash
 # Push a new build of the oakapp to the OAK device.
 #
-# Idempotent: uninstalls any existing install of this identifier, builds the
-# .oakapp from this repo, installs it, applies runtime env via
-# `oakctl app config set`, and starts it with autostart-on-boot enabled.
+# Idempotent: snapshots the previous app's runtime env, uninstalls the
+# old install, builds the .oakapp from this repo, installs it, restores
+# the snapshotted env (with any explicitly-exported vars overriding),
+# and starts it with autostart-on-boot enabled.
+#
+# The snapshot+restore is what keeps env durable across redeploys:
+# `oakctl app uninstall` wipes the config, and `oakctl app config set`
+# *replaces* the env unless --extend is passed (and even with --extend,
+# there is nothing to extend from after an uninstall). So redeploying
+# with only some of the vars exported in your shell would silently drop
+# the others. Capturing first means a deploy with just BACKEND_URL set
+# preserves an already-installed CAMERA_SHARED_SECRET / BEE_URL / etc.
 #
 # Required env:
 #   OAK_PASSWORD              OAK device root password (used by oakctl --password)
@@ -44,9 +53,30 @@ PKG_DIR="${PKG_DIR:-/tmp/oak-scan-and-sign-pkg}"
 
 OK="oakctl --password $OAK_PASSWORD"
 
-echo "[1/5] uninstall any previous installs of $IDENTIFIER on device $OAK_DEVICE"
+PREV_ENV_FILE=$(mktemp)
+NEW_ENV_FILE=$(mktemp)
+trap 'rm -f "$PREV_ENV_FILE" "$NEW_ENV_FILE"' EXIT
+
+echo "[1/5] snapshot existing env + uninstall any previous installs of $IDENTIFIER"
 APPS=$($OK app list -d "$OAK_DEVICE" --format json \
   | jq -r --arg id "$IDENTIFIER" '.[] | select(.identifier==$id) | .app_id' || true)
+# Snapshot the first match's env before nuking it. The JSON shape of
+# `app config get` isn't documented, so handle the two plausible
+# layouts: {"env": {K: V}} (most likely) or {K: V} directly. jq's `?`
+# swallows mismatches so an unexpected shape just yields an empty file
+# and the deploy continues with only the explicitly-exported vars.
+for prev in $APPS; do
+  $OK app config get "$prev" --format json 2>/dev/null \
+    | jq -r '
+        (if type == "object" and has("env") and (.env|type) == "object" then .env
+         elif type == "object" then .
+         else {} end)
+        | to_entries[]?
+        | "\(.key)=\(.value)"
+      ' > "$PREV_ENV_FILE" 2>/dev/null || true
+  echo "  snapshotted $(wc -l < "$PREV_ENV_FILE" | tr -d ' ') env var(s) from $prev"
+  break
+done
 for a in $APPS; do
   echo "  uninstalling $a"
   $OK app uninstall "$a" || true
@@ -68,27 +98,30 @@ APP_ID=$($OK app list -d "$OAK_DEVICE" --format json \
   | head -n1)
 echo "  APP_ID=$APP_ID"
 
-echo "[4/5] push runtime env"
-ENV_ARGS=(--env "BACKEND_URL=$BACKEND_URL")
-if [ -n "${CAMERA_SHARED_SECRET:-}" ]; then
-  ENV_ARGS+=(--env "CAMERA_SHARED_SECRET=$CAMERA_SHARED_SECRET")
-fi
-# Direct-storage credentials. With these set, scenes >4MB upload
-# straight to Bee/Pinata and get a real swarmRef instead of a
-# local:<sha> placeholder. Each is independent — push only what's set,
-# so a fresh BEE_URL deploy doesn't accidentally clear an existing
-# CAMERA_SHARED_SECRET (oakctl app config set is incremental — keys not
-# passed are left untouched).
-if [ -n "${BEE_URL:-}" ]; then
-  ENV_ARGS+=(--env "BEE_URL=$BEE_URL")
-fi
-if [ -n "${SWARM_POSTAGE_BATCH_ID:-}" ]; then
-  ENV_ARGS+=(--env "SWARM_POSTAGE_BATCH_ID=$SWARM_POSTAGE_BATCH_ID")
-fi
-if [ -n "${PINATA_JWT:-}" ]; then
-  ENV_ARGS+=(--env "PINATA_JWT=$PINATA_JWT")
-fi
-$OK app config set "$APP_ID" "${ENV_ARGS[@]}"
+echo "[4/5] push runtime env (snapshot + overrides)"
+# Build the merged env file: snapshotted vars first, then any
+# explicitly-exported overrides. We deduplicate at the end keeping the
+# *last* occurrence per key, so anything you re-export this run wins
+# over the snapshot, and anything you don't re-export is preserved.
+cat "$PREV_ENV_FILE" > "$NEW_ENV_FILE"
+echo "BACKEND_URL=$BACKEND_URL" >> "$NEW_ENV_FILE"
+[ -n "${CAMERA_SHARED_SECRET:-}" ]   && echo "CAMERA_SHARED_SECRET=$CAMERA_SHARED_SECRET"   >> "$NEW_ENV_FILE"
+[ -n "${BEE_URL:-}" ]                && echo "BEE_URL=$BEE_URL"                            >> "$NEW_ENV_FILE"
+[ -n "${SWARM_POSTAGE_BATCH_ID:-}" ] && echo "SWARM_POSTAGE_BATCH_ID=$SWARM_POSTAGE_BATCH_ID" >> "$NEW_ENV_FILE"
+[ -n "${PINATA_JWT:-}" ]             && echo "PINATA_JWT=$PINATA_JWT"                      >> "$NEW_ENV_FILE"
+
+# Last-occurrence-wins dedup. awk reads the file twice: pass 1 records
+# the final line number for each key; pass 2 emits only that line. Order
+# in env files doesn't matter, but preserving last-set semantics does.
+DEDUP_FILE=$(mktemp)
+trap 'rm -f "$PREV_ENV_FILE" "$NEW_ENV_FILE" "$DEDUP_FILE"' EXIT
+awk -F= '
+  NR==FNR { last[$1]=NR; next }
+  last[$1]==FNR
+' "$NEW_ENV_FILE" "$NEW_ENV_FILE" > "$DEDUP_FILE"
+
+echo "  pushing $(wc -l < "$DEDUP_FILE" | tr -d ' ') env var(s)"
+$OK app config set "$APP_ID" --env-file "$DEDUP_FILE"
 
 echo "[5/5] start with autostart-on-boot"
 # Fresh installs aren't running yet, so `app start --enable` is the right call.
