@@ -77,7 +77,7 @@ pnpm --filter @proof-of-reality/api exec tsx scripts/verify-ens.ts \
 
 ## Live deployments
 
-- Backend: https://proof-of-reality-api.vercel.app
+- Backend: https://api.realityproof.app  (custom domain on Vercel)
 - Contracts: see `docs/private/deployments.md` (Base Sepolia + Eth Sepolia)
 - ENS parent: `realityproof.eth` (Sepolia)
 - All contracts verified on Sourcify (decentralized, source on IPFS)

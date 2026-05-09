@@ -130,7 +130,7 @@ cp .env.example .env
 
 | Var | Where to get it | Notes |
 |---|---|---|
-| `PROOF_API_URL` | The Vercel production URL from step 2. | E.g. `https://proof-of-reality.vercel.app`. |
+| `PROOF_API_URL` | The production API URL. | `https://api.realityproof.app` (custom domain on Vercel). |
 | `PROOF_API_TOKEN` | Same value as `IOS_SHARED_SECRET` in `apps/api/.env`. | Yes, it's confusingly named — it's the bearer token, not an API token in any deeper sense. |
 | `ARMORY_SIGNER_URL` | Default `http://10.0.0.1` (the Armory's USB CDC Ethernet IP). Don't change unless you reconfigured the firmware. | |
 | `ATTEST_BACKEND` | `armory` if the USB Armory is plugged in and signing. `mock` for laptop dev without HW. | |

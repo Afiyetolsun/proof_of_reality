@@ -162,7 +162,7 @@ Save → **Deployments** tab → ⋯ → **Redeploy** the latest.
 Verify with the smoke test against prod:
 
 ```bash
-SMOKE_API_URL=https://proof-of-reality-api.vercel.app \
+SMOKE_API_URL=https://api.realityproof.app \
   pnpm --filter @proof-of-reality/api exec tsx scripts/smoke-mint.ts
 ```
 
