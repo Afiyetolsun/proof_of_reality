@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDisplayName</key>
+	<string>Proof of Reality</string>
+
+	<!-- ===== Permission strings ===== -->
+	<key>NSCameraUsageDescription</key>
+	<string>Proof of Reality uses the camera to scan the physical object you are proving exists.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Location is recorded so the proof can attest where the scan happened.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>The microphone records the spoken cosmic nonce that binds this scan to a moment in time.</string>
+	<key>NSMotionUsageDescription</key>
+	<string>Motion sensor data is part of the proof bundle that shows the scan came from a real device.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Proof of Reality talks to a local relay (your laptop on the same Wi-Fi) during development and demos.</string>
+
+	<!-- ===== App Transport Security =====
+	     Required so iOS allows http:// to a private-IP relay during demos.
+	     NSAllowsLocalNetworking permits cleartext to RFC1918 / .local hosts
+	     while keeping ATS strict for everything else (api.vercel.app etc). -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+		<key>NSAllowsArbitraryLoadsInWebContent</key>
+		<true/>
+	</dict>
+
+	<!-- ===== Scene + launch ===== -->
+	<key>UIApplicationSupportsIndirectInputEvents</key>
+	<true/>
+	<key>UIApplicationSceneManifest</key>
+	<dict>
+		<key>UIApplicationSupportsMultipleScenes</key>
+		<false/>
+	</dict>
+	<key>UILaunchScreen</key>
+	<dict/>
+
+	<!-- ===== Orientations ===== -->
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>UISupportedInterfaceOrientations~ipad</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationPortraitUpsideDown</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+</dict>
+</plist>

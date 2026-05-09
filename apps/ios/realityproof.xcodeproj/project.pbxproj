@@ -256,17 +256,8 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 874VHAU7TS;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "Proof of Reality";
-				INFOPLIST_KEY_NSCameraUsageDescription = "Proof of Reality uses the camera to scan the physical object you are proving exists.";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Location is recorded so the proof can attest where the scan happened.";
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "The microphone records the spoken cosmic nonce that binds this scan to a moment in time.";
-				INFOPLIST_KEY_NSMotionUsageDescription = "Motion sensor data is part of the proof bundle that shows the scan came from a real device.";
-				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
-				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -295,17 +286,8 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 874VHAU7TS;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "Proof of Reality";
-				INFOPLIST_KEY_NSCameraUsageDescription = "Proof of Reality uses the camera to scan the physical object you are proving exists.";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Location is recorded so the proof can attest where the scan happened.";
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "The microphone records the spoken cosmic nonce that binds this scan to a moment in time.";
-				INFOPLIST_KEY_NSMotionUsageDescription = "Motion sensor data is part of the proof bundle that shows the scan came from a real device.";
-				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
-				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
