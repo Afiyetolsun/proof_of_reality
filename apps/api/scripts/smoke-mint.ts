@@ -19,6 +19,7 @@ try {
   process.loadEnvFile(".env");
 } catch {}
 
+import { Buffer } from "node:buffer";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { basename, extname } from "node:path";
@@ -110,7 +111,11 @@ console.log(`  bundle SHA-256 (iOS-equiv): ${expectedHash.slice(0, 18)}…`);
 // ---- 3. upload ----
 console.log("→ POST /api/upload");
 const fd = new FormData();
-fd.append("bundle", new Blob([bundleBytes], { type: "application/json" }), "bundle.json");
+// TS 5.7+ widened Uint8Array to be generic over its backing buffer
+// (Uint8Array<ArrayBufferLike>), and Blob() now demands a strict
+// Uint8Array<ArrayBuffer> via BlobPart. Buffer.from(uint8) shares the
+// same memory (no copy) and types cleanly as a BlobPart.
+fd.append("bundle", new Blob([Buffer.from(bundleBytes)], { type: "application/json" }), "bundle.json");
 // Mime-type the scene blob by extension so backends/CDNs serve it
 // correctly when the avatar URL is opened directly in QuickLook.
 const mimeForExt: Record<string, string> = {
@@ -120,7 +125,7 @@ const mimeForExt: Record<string, string> = {
   ".obj": "text/plain",
 };
 const sceneMime = mimeForExt[extname(bundle.scene.name).toLowerCase()] ?? "application/octet-stream";
-fd.append("scene", new Blob([sceneBytes], { type: sceneMime }), bundle.scene.name);
+fd.append("scene", new Blob([Buffer.from(sceneBytes)], { type: sceneMime }), bundle.scene.name);
 const uploadRes = await fetch(`${API_URL}/api/upload`, {
   method: "POST",
   headers: auth,

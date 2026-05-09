@@ -64,3 +64,6 @@ pnpm-debug.log*
 # Demo fixtures (binary 3D assets, fetch on demand — see fixtures/README.md)
 fixtures/*
 !fixtures/README.md
+
+# Next.js auto-generated type reference (regenerated on every build)
+**/next-env.d.ts
