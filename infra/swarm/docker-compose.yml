@@ -24,6 +24,7 @@ services:
     image: ethersphere/bee:2.3.2
     container_name: po-bee
     restart: unless-stopped
+    command: ["start"]
     ports:
       - "1633:1633"   # HTTP API   ← backend talks to this
       - "1634:1634"   # P2P (TCP)  ← swarm peer connections
