@@ -1,0 +1,65 @@
+# Bee light node for Proof of Reality.
+#
+# Light node = participates in Swarm, can upload, but doesn't store other
+# people's chunks (so no staking, smaller resource footprint). Connects to
+# Swarm mainnet, settled via Gnosis Chain.
+#
+# First-run flow:
+#   1.  cp .env.example .env  (set BEE_PASSWORD to anything ≥8 chars)
+#   2.  docker compose up -d
+#   3.  ./bee-setup.sh status   # shows node wallet address
+#   4.  Fund the wallet on Gnosis Chain:
+#         - 0.05 xDAI for gas
+#         - 0.5  xBZZ for postage
+#   5.  ./bee-setup.sh stamp    # buys a postage batch, prints batch ID
+#   6.  Paste batch ID into apps/api/.env as SWARM_POSTAGE_BATCH_ID
+#       and switch STORAGE_BACKEND from "ipfs" to "swarm"
+#
+# Portable: same docker-compose runs unchanged on Hetzner / DigitalOcean /
+# any Linux VPS. For prod, override BEE_BLOCKCHAIN_RPC_ENDPOINT with a
+# private (Alchemy / dRPC / Infura) Gnosis RPC for reliability.
+
+services:
+  bee:
+    image: ethersphere/bee:2.3.2
+    container_name: po-bee
+    restart: unless-stopped
+    ports:
+      - "1633:1633"   # HTTP API   ← backend talks to this
+      - "1634:1634"   # P2P (TCP)  ← swarm peer connections
+    volumes:
+      - bee-data:/home/bee/.bee
+    environment:
+      # Passwords / data
+      BEE_PASSWORD: "${BEE_PASSWORD:?set BEE_PASSWORD in .env (min 8 chars)}"
+      BEE_DATA_DIR: /home/bee/.bee
+
+      # Network bindings
+      BEE_API_ADDR: ":1633"
+      BEE_P2P_ADDR: ":1634"
+      BEE_NAT_ADDR: "${BEE_NAT_ADDR:-}"  # set to your-public-ip:1634 on a VPS
+
+      # Light node — uploads only, no storage forwarding
+      BEE_FULL_NODE: "false"
+      BEE_SWAP_ENABLE: "true"
+
+      # Gnosis Chain endpoints (Bee uses this for chequebook + postage txs)
+      BEE_BLOCKCHAIN_RPC_ENDPOINT: "${BEE_BLOCKCHAIN_RPC_ENDPOINT:-https://rpc.gnosis.gateway.fm}"
+
+      # Persist postage stamps across restarts (default true on 2.x but
+      # explicit for clarity)
+      BEE_USE_POSTAGE_SNAPSHOT: "true"
+
+      # Logs
+      BEE_VERBOSITY: "info"
+
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:1633/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+volumes:
+  bee-data:
+    name: po-bee-data
