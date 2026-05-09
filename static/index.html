@@ -11,14 +11,19 @@
   main { display: flex; flex-direction: column; }
   iframe { flex: 1; border: 0; }
   h1 { font-size: 16px; margin: 0 0 12px; }
-  button { font-size: 15px; padding: 10px 14px; margin-right: 8px; cursor: pointer;
+  button { font-size: 14px; padding: 9px 12px; cursor: pointer;
            border-radius: 6px; border: 1px solid #8886; background: #0001; }
-  button.rec { background: #c33; color: white; border-color: #911; }
-  button.stop { background: #2a2; color: white; border-color: #181; }
-  button:disabled { opacity: 0.5; cursor: default; }
-  .row { display: flex; align-items: center; gap: 8px; margin: 8px 0; }
+  button.photo { background: #246; color: white; border-color: #135; }
+  button.video { background: #c33; color: white; border-color: #911; }
+  button.cloud { background: #5a3; color: white; border-color: #371; }
+  button.stop { background: #f80; color: white; border-color: #c60; }
+  button:disabled { opacity: 0.4; cursor: default; }
+  .row { display: flex; align-items: center; gap: 6px; margin: 8px 0; flex-wrap: wrap; }
   .pill { padding: 2px 8px; border-radius: 999px; font-size: 12px; background: #8884; }
   .pill.live { background: #c33; color: white; }
+  .pill.mode-photo { background: #246; color: white; }
+  .pill.mode-video { background: #c33; color: white; }
+  .pill.mode-cloud { background: #5a3; color: white; }
   .scan { border: 1px solid #8884; border-radius: 8px; padding: 8px 10px;
           margin: 8px 0; font-size: 13px; }
   .scan code { font-size: 11px; word-break: break-all; }
@@ -26,24 +31,31 @@
   .err { color: #c33; }
   .meta { color: #888; font-size: 11px; margin-top: 4px; }
   a { color: inherit; }
-  hr { border: 0; border-top: 1px solid #8884; margin: 16px 0; }
+  hr { border: 0; border-top: 1px solid #8884; margin: 14px 0; }
+  small { color: #888; font-size: 11px; }
 </style>
 </head>
 <body>
 <aside>
   <h1>Scan &amp; Sign</h1>
+
   <div class="row">
-    <button id="start" class="rec">Start record</button>
-    <button id="stop" class="stop" disabled>Stop &amp; sign</button>
+    <button id="btn-photo" class="photo" title="Capture the current frame as a colored PLY">📷 Photo</button>
+    <button id="btn-video" class="video" title="Record a stream of (color, depth) frames">🎥 Video</button>
+    <button id="btn-cloud" class="cloud" title="Run RGB-D SLAM and merge into one point cloud">🌐 Cloud</button>
   </div>
   <div class="row">
+    <button id="btn-stop" class="stop" disabled>⏹ Stop &amp; sign</button>
     <span class="pill" id="state">idle</span>
     <span id="elapsed"></span>
     <span id="frames"></span>
   </div>
+  <small id="hint">Photo = single frame · Video = .npz frame stream · Cloud = TSDF SLAM merge</small>
+
   <div class="row">
     <a id="vizlink" href="#" target="_blank" rel="noopener">Open live preview &#8599;</a>
   </div>
+
   <hr>
   <div id="scans"></div>
 </aside>
@@ -81,19 +93,38 @@ function vizUrlFromConfig(c) {
   }
 })();
 
-let polling = null;
+function setRecordingButtons(state) {
+  const recording = !!state.recording;
+  ['btn-photo', 'btn-video', 'btn-cloud'].forEach(id => {
+    $(id).disabled = recording;
+  });
+  $('btn-stop').disabled = !recording;
+}
 
 async function refreshState() {
   try {
     const r = await fetch('/record/state');
     const s = await r.json();
-    $('start').disabled = s.recording;
-    $('stop').disabled = !s.recording;
-    $('state').textContent = s.recording ? `recording ${s.scan_id}` : 'idle';
-    $('state').classList.toggle('live', s.recording);
+    setRecordingButtons(s);
+    if (s.recording) {
+      $('state').textContent = `${s.mode} · ${s.scan_id}`;
+      $('state').className = 'pill mode-' + s.mode;
+    } else {
+      $('state').textContent = 'idle';
+      $('state').className = 'pill';
+    }
     $('elapsed').textContent = s.recording ? `${s.elapsed_s}s` : '';
     $('frames').textContent = s.recording ? `${s.frame_count} frames` : '';
   } catch {}
+}
+
+function fmtPts(n) {
+  return (n == null) ? '—' : Number(n).toLocaleString();
+}
+
+function modePill(mode) {
+  const cls = mode ? `pill mode-${mode}` : 'pill';
+  return `<span class="${cls}">${mode || '?'}</span>`;
 }
 
 async function refreshScans() {
@@ -106,20 +137,23 @@ async function refreshScans() {
       : g.error
         ? `<span class="err">sign failed: ${g.error}</span>`
         : `<span class="err">unsigned</span>`;
-    const frames = s.frames_integrated ?? s.frame_count ?? '?';
+    const frames = s.frames_integrated ?? s.frame_count ?? '—';
+    const pts = fmtPts(s.point_count);
+    const sha = s.artifact_sha256 || s.ply_sha256 || '';
+    const artifact = s.artifact || `${s.scan_id}.ply`;
     return `<div class="scan">
-      <div><strong>${s.scan_id}</strong> &nbsp; ${macHtml}</div>
+      <div>${modePill(s.mode)} <strong>${s.scan_id}</strong> &nbsp; ${macHtml}</div>
       <div class="meta">
-        ${s.point_count.toLocaleString()} pts ·
+        ${pts} pts ·
         ${frames} frames ·
         ${s.duration_s}s
         ${g.device_id ? '· dev '+g.device_id : ''}
       </div>
       <div class="meta">
-        <code>sha256 ${s.ply_sha256}</code>
+        <code>sha256 ${sha}</code>
       </div>
       <div class="meta">
-        <a href="/scans/${s.scan_id}.ply" download>PLY</a> ·
+        <a href="/scans/${artifact}" download>${artifact.split('.').pop().toUpperCase()}</a> ·
         <a href="/scans/${s.scan_id}.json" target="_blank">envelope</a>
       </div>
     </div>`;
@@ -127,19 +161,42 @@ async function refreshScans() {
   $('scans').innerHTML = html;
 }
 
-$('start').onclick = async () => {
-  $('start').disabled = true;
-  await fetch('/record/start', { method: 'POST' });
+async function startRecording(mode) {
+  const r = await fetch(`/record/start/${mode}`, { method: 'POST' });
+  if (!r.ok) {
+    const t = await r.text();
+    alert(`start ${mode} failed: ${t}`);
+  }
   refreshState();
-};
-$('stop').onclick = async () => {
-  $('stop').disabled = true;
-  $('stop').textContent = 'signing…';
+}
+
+async function takePhoto() {
+  ['btn-photo','btn-video','btn-cloud'].forEach(id => $(id).disabled = true);
+  try {
+    const r = await fetch('/capture/photo', { method: 'POST' });
+    if (!r.ok) {
+      const t = await r.text();
+      alert(`photo failed: ${t}`);
+    }
+  } finally {
+    refreshState();
+    refreshScans();
+  }
+}
+
+async function stopRecording() {
+  $('btn-stop').disabled = true;
+  $('btn-stop').textContent = '⏳ signing…';
   try { await fetch('/record/stop', { method: 'POST' }); } catch {}
-  $('stop').textContent = 'Stop & sign';
+  $('btn-stop').textContent = '⏹ Stop & sign';
   refreshState();
   refreshScans();
-};
+}
+
+$('btn-photo').onclick = takePhoto;
+$('btn-video').onclick = () => startRecording('video');
+$('btn-cloud').onclick = () => startRecording('cloud');
+$('btn-stop').onclick = stopRecording;
 
 setInterval(refreshState, 500);
 setInterval(refreshScans, 3000);
