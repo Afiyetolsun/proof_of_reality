@@ -335,8 +335,18 @@ def write_photo(scan_id, pts, cols):
 
 def write_cloud(scan_id, pcd):
     path = SCANS_DIR / f"{scan_id}.ply"
+    # Strip statistical outliers before writing: Open3D's TSDF emits
+    # isolated points around depth-discontinuity edges and on
+    # uncertain pixels. nb_neighbors=20 / std_ratio=2.0 is a
+    # conservative setting (drops ~5% on a typical room scan) that
+    # cleans the cloud without eating real geometry.
+    raw = int(len(pcd.points))
+    if raw > 50:
+        pcd, _ = pcd.remove_statistical_outlier(nb_neighbors=20, std_ratio=2.0)
+    kept = int(len(pcd.points))
     o3d.io.write_point_cloud(str(path), pcd, write_ascii=False, compressed=False)
-    return path, {'point_count': int(len(pcd.points)), 'artifact': path.name}
+    return path, {'point_count': kept, 'point_count_raw': raw,
+                  'outliers_dropped': raw - kept, 'artifact': path.name}
 
 
 def write_video(scan_id, frames, K, w, h, fps):
