@@ -12,6 +12,12 @@
 #   CAMERA_SHARED_SECRET      pairs with backend's CAMERA_SHARED_SECRET
 #   BACKEND_URL               default: https://proof-of-reality-api.vercel.app
 #
+# Direct-storage env (omit to leave the OAK in api-only mode, in which
+# scenes >4MB silently downgrade to local:<sha> and aren't pinned):
+#   BEE_URL                   Bee node URL, e.g. http://89.116.31.10:1633
+#   SWARM_POSTAGE_BATCH_ID    Bee postage batch ID
+#   PINATA_JWT                alternative IPFS path; takes precedence over Bee
+#
 # Optional env:
 #   OAK_DEVICE                oakctl -d argument (default 1 → first listed device)
 #   IDENTIFIER                oakapp identifier (default from oakapp.toml)
@@ -19,6 +25,8 @@
 # Example:
 #   OAK_PASSWORD=12345678 \
 #   CAMERA_SHARED_SECRET=$(cat ~/secrets/oak-camera-key) \
+#   BEE_URL=http://89.116.31.10:1633 \
+#   SWARM_POSTAGE_BATCH_ID=810e263a9eba821cfebd943cbf1e4885e1983ddc47b93faab7370f516bc44067 \
 #   ./scripts/deploy-app.sh
 #
 # This is the *app* deploy. The *host* deploy (USB Armory forwarder /
@@ -64,6 +72,21 @@ echo "[4/5] push runtime env"
 ENV_ARGS=(--env "BACKEND_URL=$BACKEND_URL")
 if [ -n "${CAMERA_SHARED_SECRET:-}" ]; then
   ENV_ARGS+=(--env "CAMERA_SHARED_SECRET=$CAMERA_SHARED_SECRET")
+fi
+# Direct-storage credentials. With these set, scenes >4MB upload
+# straight to Bee/Pinata and get a real swarmRef instead of a
+# local:<sha> placeholder. Each is independent — push only what's set,
+# so a fresh BEE_URL deploy doesn't accidentally clear an existing
+# CAMERA_SHARED_SECRET (oakctl app config set is incremental — keys not
+# passed are left untouched).
+if [ -n "${BEE_URL:-}" ]; then
+  ENV_ARGS+=(--env "BEE_URL=$BEE_URL")
+fi
+if [ -n "${SWARM_POSTAGE_BATCH_ID:-}" ]; then
+  ENV_ARGS+=(--env "SWARM_POSTAGE_BATCH_ID=$SWARM_POSTAGE_BATCH_ID")
+fi
+if [ -n "${PINATA_JWT:-}" ]; then
+  ENV_ARGS+=(--env "PINATA_JWT=$PINATA_JWT")
 fi
 $OK app config set "$APP_ID" "${ENV_ARGS[@]}"
 

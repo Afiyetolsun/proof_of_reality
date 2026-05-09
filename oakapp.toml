@@ -22,6 +22,11 @@ build_steps = []
 #                           main LAN IP so the container reaches the host-side
 #                           TCP forwarder which proxies to the Armory bridge)
 #   DEVICE_BUNDLE_ID       (default io.luxonis.scan-and-sign)
+#   BEE_URL                (Bee node for direct scene upload, e.g.
+#                           http://89.116.31.10:1633 — required for cloud-mode
+#                           scenes >4MB to actually be pinned)
+#   SWARM_POSTAGE_BATCH_ID (Bee postage batch ID — pairs with BEE_URL)
+#   PINATA_JWT             (alternative IPFS path; takes precedence over Bee)
 entrypoint = [
     "bash", "-c",
     "python3 -u /app/main.py --gotee-host $(hostname -I | awk '{print $1}')",

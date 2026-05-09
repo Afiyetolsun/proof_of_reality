@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import secrets
 import subprocess
 import sys
@@ -16,7 +17,7 @@ import depthai as dai
 import numpy as np
 import open3d as o3d
 import uvicorn
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -115,6 +116,18 @@ def parse_args():
                    default=_env("DEVICE_BUNDLE_ID", "io.luxonis.scan-and-sign"))
     p.add_argument("--no-mint", action="store_true",
                    help="Build + sign locally but skip backend upload/mint.")
+    # Direct-to-storage upload (bypasses Vercel's 4MB body cap on /api/upload).
+    # Without these, scenes >4MB are silently downgraded to a `local:<sha>`
+    # swarmRef and the file is never actually pinned anywhere.
+    p.add_argument("--bee-url", default=_env("BEE_URL", _env("SWARM_BEE_URL")),
+                   help="Bee node URL for direct scene upload (e.g. https://bee.example.com). "
+                        "Reads BEE_URL or SWARM_BEE_URL.")
+    p.add_argument("--swarm-postage-batch-id",
+                   default=_env("SWARM_POSTAGE_BATCH_ID"),
+                   help="Bee postage batch ID for paying for storage stamps.")
+    p.add_argument("--pinata-jwt", default=_env("PINATA_JWT"),
+                   help="Pinata JWT for direct IPFS pinning. If set, takes "
+                        "precedence over Bee config.")
     a = p.parse_args()
     w, h = (int(v) for v in a.size.lower().split("x"))
     a.size = (w, h)
@@ -610,11 +623,45 @@ def _hash_file(path):
     return h.hexdigest()
 
 
+_ADDR_RE = re.compile(r"^0x[0-9a-fA-F]{40}$")
+
+
+async def _read_mint_opts(request: Request) -> dict:
+    """Pull optional per-scan mint customisation from the request body.
+
+    The frontend sends `{label?, recipient?}` as JSON; older clients (or
+    curl) may send no body at all, so we treat any missing/malformed
+    payload as "no overrides" rather than 422-ing the capture itself.
+
+    Returns a dict with only the keys the user actually set, so callers
+    can spread it into backend.mint() without overriding defaults.
+    """
+    try:
+        raw = await request.body()
+        if not raw:
+            return {}
+        data = json.loads(raw)
+    except Exception:
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    out: dict = {}
+    label = (data.get("label") or "").strip()
+    if label:
+        out["label"] = label
+    recipient = (data.get("recipient") or "").strip()
+    if recipient:
+        if not _ADDR_RE.match(recipient):
+            raise HTTPException(400, "recipient must be 0x + 40 hex chars")
+        out["recipient"] = recipient
+    return out
+
+
 def make_app(args, mgr, backend: BackendClient | None):
     app = FastAPI()
     app.mount("/static", StaticFiles(directory=str(ROOT / "static")), name="static")
 
-    def _finalize(snap, artifact_path, extra):
+    def _finalize(snap, artifact_path, extra, mint_opts: dict | None = None):
         """Build the canonical bundle, sign it, and try to mint.
 
         Tiered degradation:
@@ -628,6 +675,7 @@ def make_app(args, mgr, backend: BackendClient | None):
         """
         sha = _hash_file(artifact_path)
         capture_mode = snap['mode']
+        mint_opts = mint_opts or {}
         envelope = {
             "scan_id": snap['scan_id'],
             "mode": capture_mode,
@@ -645,6 +693,9 @@ def make_app(args, mgr, backend: BackendClient | None):
             "mint": None,
             "tier": None,
             "mint_pending": False,
+            # Persist user-supplied mint overrides so /retry-mint can replay
+            # them verbatim when the backend comes back online.
+            "mint_opts": mint_opts,
             **extra,
         }
 
@@ -735,6 +786,8 @@ def make_app(args, mgr, backend: BackendClient | None):
                 attestation_type=1,
                 captured_at=int(snap['t_end']),
                 mode=MINT_MODE_BY_CAPTURE[capture_mode],
+                label=mint_opts.get("label"),
+                recipient=mint_opts.get("recipient"),
             )
             envelope["mint"] = mint_resp
         except BackendError as e:
@@ -762,6 +815,8 @@ def make_app(args, mgr, backend: BackendClient | None):
                 "no_sign": bool(args.no_sign),
                 "no_mint": bool(args.no_mint or backend is None),
                 "backend_url": args.backend_url or None,
+                "storage_backend": (backend.storage_backend
+                                    if backend is not None else "none"),
                 "video_max_frames": args.video_max_frames}
 
     @app.get("/healthz")
@@ -786,22 +841,25 @@ def make_app(args, mgr, backend: BackendClient | None):
         if backend_ok:
             nonce_source = "satellite"
         achievable = _compute_tier(nonce_source, connected)
+        storage = backend.storage_backend if backend is not None else "none"
         return {
             "token": {"connected": connected, "msg": msg,
                       "host": args.gotee_host, "port": args.gotee_port},
             "backend": {"ok": backend_ok, "msg": backend_msg,
-                        "url": backend.base_url if backend else None},
+                        "url": backend.base_url if backend else None,
+                        "storage": storage},
             "tier": achievable,
             "ready": connected and (backend_ok or backend is None),
         }
 
     @app.post("/retry-mint/{scan_id}")
-    def retry_mint(scan_id: str):
+    async def retry_mint(scan_id: str, request: Request):
         """Replay a previously persisted bundle (typically from Space Mode)
         through upload + mint when the backend comes back online. The
         bundle bytes on disk are the canonical hash-source — we re-send
         them verbatim, so the on-chain bundleHash matches what the
         Armory already signed."""
+        request_opts = await _read_mint_opts(request)
         if "/" in scan_id or ".." in scan_id:
             raise HTTPException(400, "bad scan_id")
         env_path = SCANS_DIR / f"{scan_id}.json"
@@ -827,6 +885,12 @@ def make_app(args, mgr, backend: BackendClient | None):
         bundle = envelope.get("bundle") or {}
         sat_sig = bundle.get("satSig", "")
         capture_mode = envelope.get("mode", "cloud")
+        # Per-call overrides win; otherwise replay whatever the user set
+        # at original capture time. Persisting on the envelope means a
+        # Space-Mode retry produces the same ENS subname as a
+        # backend-online capture would have.
+        stored_opts = envelope.get("mint_opts") or {}
+        merged_opts = {**stored_opts, **request_opts}
 
         try:
             up = backend.upload_or_local(bundle_bytes, artifact_path)
@@ -840,6 +904,8 @@ def make_app(args, mgr, backend: BackendClient | None):
                 attestation_type=1,
                 captured_at=int(envelope["ts"]),
                 mode=MINT_MODE_BY_CAPTURE.get(capture_mode, 1),
+                label=merged_opts.get("label"),
+                recipient=merged_opts.get("recipient"),
             )
         except BackendError as e:
             raise HTTPException(502, f"retry failed: {e}")
@@ -848,20 +914,22 @@ def make_app(args, mgr, backend: BackendClient | None):
         envelope["backend"]["upload"] = up
         envelope["mint"] = mint_resp
         envelope["mint_pending"] = False
+        envelope["mint_opts"] = merged_opts
         # Tier of a retried mint reflects what was *captured*, not what's now
         # achievable — keep the original tier label; only the mint state changed.
         env_path.write_text(json.dumps(envelope, indent=2))
         return envelope
 
     @app.post("/capture/photo")
-    def capture_photo():
+    async def capture_photo(request: Request):
+        opts = await _read_mint_opts(request)
         snap = mgr.take_photo()
         if snap is None:
             raise HTTPException(503, "pipeline not ready (no frames yet)")
         if snap['pts'].shape[0] == 0:
             raise HTTPException(400, "no valid depth in current frame")
         path, extra = write_photo(snap['scan_id'], snap['pts'], snap['cols'])
-        return _finalize(snap, path, extra)
+        return _finalize(snap, path, extra, mint_opts=opts)
 
     @app.post("/record/start/{mode}")
     def record_start(mode: str):
@@ -873,7 +941,8 @@ def make_app(args, mgr, backend: BackendClient | None):
         return {"scan_id": scan_id, "mode": mode, "status": "recording"}
 
     @app.post("/record/stop")
-    def record_stop():
+    async def record_stop(request: Request):
+        opts = await _read_mint_opts(request)
         snap = mgr.stop_recording()
         if snap is None:
             raise HTTPException(409, "not recording")
@@ -884,14 +953,14 @@ def make_app(args, mgr, backend: BackendClient | None):
                                          "VIO may not have converged. Move slower.")
             path, extra = write_cloud(snap['scan_id'], pcd, snap.get('mesh'))
             extra['integrated'] = snap.get('updates', 0)
-            return _finalize(snap, path, extra)
+            return _finalize(snap, path, extra, mint_opts=opts)
         if snap['mode'] == 'video':
             frames = snap.get('frames') or []
             if not frames:
                 raise HTTPException(400, "no frames captured")
             path, extra = write_video(
                 snap['scan_id'], frames, mgr.K, mgr.W, mgr.H, args.fps)
-            return _finalize(snap, path, extra)
+            return _finalize(snap, path, extra, mint_opts=opts)
         raise HTTPException(500, f"unknown mode {snap['mode']!r}")
 
     @app.get("/record/state")
@@ -910,8 +979,21 @@ def make_app(args, mgr, backend: BackendClient | None):
 
     @app.get("/scans")
     def list_scans():
+        # Two JSON files exist per scan: the envelope ({scan_id}.json) and
+        # the canonical bundle ({scan_id}.bundle.json) used as the on-chain
+        # hash source. Only the envelope is a "scan" — the bundle has no
+        # scan_id/mode/etc. and rendering it produces the "undefined /
+        # unsigned" ghost rows users were seeing.
+        envelopes = [
+            p for p in SCANS_DIR.glob("*.json")
+            if not p.name.endswith(".bundle.json")
+        ]
+        # mtime sort: scan_id is a random UUID prefix, so filename-sort
+        # is effectively random. mtime tracks finalize-time, which is
+        # what users mean by "newest".
+        envelopes.sort(key=lambda p: p.stat().st_mtime, reverse=True)
         out = []
-        for p in sorted(SCANS_DIR.glob("*.json"), reverse=True):
+        for p in envelopes:
             try:
                 out.append(json.loads(p.read_text()))
             except Exception:
@@ -965,8 +1047,19 @@ def main():
 
     backend: BackendClient | None = None
     if args.backend_url and args.shared_secret:
-        backend = BackendClient(args.backend_url, args.shared_secret)
-        print(f"[backend] {args.backend_url} (auth: X-Camera-Key)")
+        backend = BackendClient(
+            args.backend_url, args.shared_secret,
+            bee_url=args.bee_url,
+            postage_batch_id=args.swarm_postage_batch_id,
+            pinata_jwt=args.pinata_jwt,
+        )
+        storage = backend.storage_backend
+        if storage == "none":
+            print(f"[backend] {args.backend_url} (auth: X-Camera-Key, "
+                  "storage: multipart-via-API; scenes >4MB will not be pinned)")
+        else:
+            print(f"[backend] {args.backend_url} (auth: X-Camera-Key, "
+                  f"storage: direct-{storage})")
     elif args.backend_url and not args.shared_secret:
         print("[backend] BACKEND_URL set but CAMERA_SHARED_SECRET / IOS_SHARED_SECRET "
               "missing — backend disabled")
