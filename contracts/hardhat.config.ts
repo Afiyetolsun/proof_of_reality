@@ -52,6 +52,15 @@ const config: HardhatUserConfig = {
       },
     ],
   },
+  // Sourcify is decentralized + key-less. Use as fallback / additional
+  // verification target. Etherscan V1 endpoints are EOL; until we
+  // migrate to V2 + a single Etherscan.io API key, Sourcify is the
+  // working path.
+  sourcify: {
+    enabled: true,
+    apiUrl: "https://sourcify.dev/server",
+    browserUrl: "https://repo.sourcify.dev",
+  },
   paths: {
     sources: "./contracts",
     tests: "./test",
