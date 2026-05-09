@@ -135,9 +135,11 @@ the recorder dials the host LAN IP.
 │   ├── README.md       build + flash instructions
 │   └── sign_hash.rs    HMAC-SHA256 with hardware-derived key
 └── scripts/
-    ├── deploy.sh       one-shot: scp + run setup on the OAK
-    ├── forwarder.py    TCP relay (runs on the OAK host)
-    └── oak-host-setup.sh  bring up usb0, restart forwarder
+    ├── deploy.sh           scp scripts to OAK and run setup (--systemd opt)
+    ├── forwarder.py        TCP relay (runs on the OAK host)
+    ├── oak-host-setup.sh   one-shot: bring up usb0, start forwarder
+    ├── install-systemd.sh  install oak-gotee.service for boot auto-start
+    └── oak-gotee.service   systemd unit (BindsTo usb0 device, Restart=always)
 ```
 
 ---
@@ -169,14 +171,37 @@ bun run upload target/armv7a-none-eabi/release/trusted_applet
 
 Full instructions in [`gotee-applet/README.md`](gotee-applet/README.md).
 
-### 2. Set up the OAK host (after every reboot / USB cycle)
+### 2. Set up the OAK host
+
+**One-shot (this boot only):**
 
 ```bash
 OAK_IP=192.168.88.236 ./scripts/deploy.sh
 ```
 
-This scp's the forwarder onto the OAK and brings `usb0` up at `10.0.0.2/24`.
-Re-run any time the link drops.
+Brings `usb0` up at `10.0.0.2/24` and starts the forwarder in the
+background. Goes away on reboot. Good for first-time testing.
+
+**Persistent (recommended):**
+
+```bash
+OAK_IP=192.168.88.236 ./scripts/deploy.sh --systemd
+```
+
+Installs the forwarder as a systemd unit (`oak-gotee.service`) that:
+
+- auto-starts on boot,
+- auto-restarts if the python process dies,
+- is `BindsTo` the `cdc_ether` `usb0` device — when you unplug the
+  Armory the service stops; when you plug it back in it starts again.
+
+After install you can manage it like any other service:
+
+```bash
+ssh root@<oak-ip> 'systemctl status oak-gotee'
+ssh root@<oak-ip> 'journalctl -u oak-gotee -f'
+ssh root@<oak-ip> 'systemctl restart oak-gotee'
+```
 
 ### 3. Deploy the oakapp
 
@@ -232,7 +257,9 @@ mints the result as an on-chain Reality NFT.
 
 - **No IMU in the SLAM path.** Open3D RGB-D odometry is purely visual; fast
   motion or featureless walls cause drift. Pan slowly.
-- **`usb0` drops on sshd restarts.** Re-run `scripts/oak-host-setup.sh`.
+- **`usb0` drops on sshd restarts.** The systemd service brings it back
+  automatically (re-adds the `10.0.0.2/24` address on every restart);
+  if you used the one-shot `deploy.sh` path instead, re-run it manually.
 - **The HMAC binds `payload || nonce` only.** A production envelope should
   also bind `ts`, `device_id`, and (for Proof of Reality) the cosmic
   Orbitport nonce.

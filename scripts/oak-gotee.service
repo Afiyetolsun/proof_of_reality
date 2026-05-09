@@ -1,0 +1,24 @@
+[Unit]
+Description=GoTEE TCP forwarder + usb0 link (LAN:4000 -> usb0:10.0.0.1:4000)
+# Bind to the cdc_ether usb0 device so we auto-start when the Armory is
+# plugged in and auto-stop when it's unplugged.
+BindsTo=sys-subsystem-net-devices-usb0.device
+After=sys-subsystem-net-devices-usb0.device network.target
+StartLimitIntervalSec=30
+StartLimitBurst=10
+
+[Service]
+Type=simple
+# Bring usb0 up with a static address (CDC-ECM doesn't run DHCP).
+# Tolerate the address being already set across restarts.
+ExecStartPre=-/sbin/ip link set usb0 up
+ExecStartPre=-/sbin/ip addr add 10.0.0.2/24 dev usb0
+ExecStart=/usr/bin/python3 /opt/oak-gotee/forwarder.py
+Restart=always
+RestartSec=2
+User=root
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
