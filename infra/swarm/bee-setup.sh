@@ -81,6 +81,56 @@ case "$cmd" in
     docker compose logs -f bee
     ;;
 
+  watch)
+    # Poll /stamps every WATCH_INTERVAL seconds. Print TTL + capacity
+    # use; loud warning under WARN_DAYS days remaining. Optionally POST
+    # the warning to WEBHOOK_URL (Slack/Discord-compatible JSON).
+    interval="${WATCH_INTERVAL:-300}"
+    warn_days="${WARN_DAYS:-3}"
+    blocks_per_day=17280
+    secs_per_day=86400
+    # Note: don't use `set -e` semantics inside this loop — a single API
+    # blip would otherwise kill the daemon. We tolerate transient errors.
+    set +e
+    echo "watching $BEE_API/stamps every ${interval}s; warn under ${warn_days}d"
+    while true; do
+      ts=$(date "+%Y-%m-%d %H:%M:%S")
+      out=$(curl -fsS "$BEE_API/stamps" 2>/dev/null)
+      if [[ -z "$out" ]]; then
+        echo "[$ts] api unreachable"
+        sleep "$interval"
+        continue
+      fi
+      # Parse + summarize each batch via python; emit one printable line per batch.
+      report=$(echo "$out" | WARN_DAYS_PY="$warn_days" python3 -c '
+import sys, json, os
+warn = int(os.environ["WARN_DAYS_PY"]) * 86400
+data = json.load(sys.stdin).get("stamps", [])
+for s in data:
+    bid = s.get("batchID", "?")[:12]
+    ttl = s.get("batchTTL", -1)
+    util = s.get("utilization", 0)
+    usable = s.get("usable", False)
+    days_str = "infinity" if ttl == -1 else f"{ttl/86400:.1f}d"
+    flag = "WARN" if (0 <= ttl < warn) else "ok"
+    print(f"{flag}\t{bid}\tusable={usable}\tutil={util}\tttl={days_str}")
+')
+      while IFS=$'\t' read -r flag bid_short rest; do
+        [[ -z "$bid_short" ]] && continue
+        echo "[$ts] $flag $bid_short… $rest"
+        if [[ "$flag" == "WARN" ]]; then
+          msg="⚠️  Swarm postage $bid_short… running low: $rest. Top up: ./bee-setup.sh stamp"
+          echo "$msg"
+          if [[ -n "${WEBHOOK_URL:-}" ]]; then
+            curl -fsS -X POST -H "Content-Type: application/json" \
+              -d "{\"text\":\"$msg\"}" "$WEBHOOK_URL" > /dev/null 2>&1 || true
+          fi
+        fi
+      done <<< "$report"
+      sleep "$interval"
+    done
+    ;;
+
   stamp)
     if [[ "$STAMP_AMOUNT" == "auto" ]]; then
       # Read live price + compute amount for STAMP_DAYS of validity, with
@@ -137,7 +187,12 @@ case "$cmd" in
     ;;
 
   *)
-    echo "usage: $0 {status|stamp|stamps|upload <file>|logs}"
+    echo "usage: $0 {status|stamp|stamps|upload <file>|logs|watch}"
+    echo
+    echo "watch options (env vars):"
+    echo "  WATCH_INTERVAL  poll cadence in seconds (default 300)"
+    echo "  WARN_DAYS       warn when batch TTL < this (default 3)"
+    echo "  WEBHOOK_URL     POST warning JSON to this URL (Slack/Discord webhook)"
     exit 1
     ;;
 esac
