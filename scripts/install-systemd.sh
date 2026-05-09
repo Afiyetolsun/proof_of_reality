@@ -14,7 +14,8 @@
 set -eu
 
 SRCDIR="${SRCDIR:-/tmp}"
-INSTALL_DIR=/opt/oak-gotee
+# Some OAK images mount /opt read-only; /var/lib is reliably writable.
+INSTALL_DIR=/var/lib/oak-gotee
 UNIT_PATH=/etc/systemd/system/oak-gotee.service
 
 mkdir -p "$INSTALL_DIR"

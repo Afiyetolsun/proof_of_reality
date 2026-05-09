@@ -13,7 +13,7 @@ Type=simple
 # Tolerate the address being already set across restarts.
 ExecStartPre=-/sbin/ip link set usb0 up
 ExecStartPre=-/sbin/ip addr add 10.0.0.2/24 dev usb0
-ExecStart=/usr/bin/python3 /opt/oak-gotee/forwarder.py
+ExecStart=/usr/bin/python3 /var/lib/oak-gotee/forwarder.py
 Restart=always
 RestartSec=2
 User=root
