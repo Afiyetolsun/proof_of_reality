@@ -34,10 +34,14 @@ def parse_args():
     p.add_argument("--gotee-host", default="10.0.0.1")
     p.add_argument("--gotee-port", type=int, default=4000)
     p.add_argument("--no-sign", action="store_true")
-    p.add_argument("--voxel-size", type=float, default=0.02,
-                   help="TSDF voxel length in metres (cloud mode)")
-    p.add_argument("--sdf-trunc", type=float, default=0.06,
-                   help="TSDF truncation distance in metres (cloud mode)")
+    p.add_argument("--voxel-size", type=float, default=0.01,
+                   help="TSDF voxel length in metres (cloud mode). 0.01 m "
+                        "(1 cm) gives sharp close-object detail; the grid "
+                        "pattern visible on flat surfaces at 0.02 m is "
+                        "the voxel grid showing through.")
+    p.add_argument("--sdf-trunc", type=float, default=0.03,
+                   help="TSDF truncation distance in metres (cloud mode). "
+                        "Kept at 3x voxel-size --- standard ratio.")
     p.add_argument("--depth-max", type=float, default=2.0,
                    help="Drop depths beyond this (metres). Tighter values "
                         "(1.5-2.5 m) keep the cloud focused on close "
