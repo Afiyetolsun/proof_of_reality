@@ -31,8 +31,13 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
-      <body>{children}</body>
+    // suppressHydrationWarning on <html>: browser extensions (Penumbra,
+    // dark-mode helpers, etc) routinely inject className/style on the
+    // root before React hydrates. Without this, every user with a
+    // wallet extension sees a noisy "tree didn't match" overlay even
+    // though the mismatch is purely cosmetic.
+    <html lang="en" suppressHydrationWarning>
+      <body suppressHydrationWarning>{children}</body>
     </html>
   );
 }

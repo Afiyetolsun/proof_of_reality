@@ -15,7 +15,7 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import { USDZLoader } from "three-usdz-loader";
+import { USDZLoader } from "three/examples/jsm/loaders/USDZLoader.js";
 
 interface Props {
   url: string;
@@ -72,20 +72,22 @@ export function UsdzCanvas({ url }: Props) {
     controls.maxDistance = 50;
 
     // ---- 4. Load the USDZ ----
+    // Using three.js's official USDZLoader — pure JS, no WASM, no
+    // SharedArrayBuffer requirement, no COOP/COEP headers needed.
+    // Unzips the USDZ container with fflate and parses the USDC
+    // binary directly. Handles geometry + textures + basic PBR.
     const loader = new USDZLoader();
-    const groupHolder = new THREE.Group();
-    scene.add(groupHolder);
+    let loaded: THREE.Group | null = null;
 
     (async () => {
       try {
         const res = await fetch(url);
         if (!res.ok) throw new Error(`fetch ${res.status}`);
-        const blob = await res.blob();
-        // three-usdz-loader expects a File, not just a Blob
-        const file = new File([blob], "scene.usdz", { type: "model/vnd.usdz+zip" });
-        await loader.loadFile(file, groupHolder);
+        const buf = await res.arrayBuffer();
         if (disposed) return;
-        frameCamera(groupHolder, camera, controls);
+        loaded = loader.parse(buf);
+        scene.add(loaded);
+        frameCamera(loaded, camera, controls);
         setStatus("ready");
       } catch (e) {
         if (disposed) return;
