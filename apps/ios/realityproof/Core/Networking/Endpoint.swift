@@ -46,8 +46,13 @@ struct NonceResponse: Decodable {
 }
 
 struct UploadResponse: Decodable {
-    let swarmRef: String
+    /// Backend-pinned scene ref. Nil when iOS uploaded the scene directly
+    /// to Bee (big scene path) and only sent the bundle through /api/upload.
+    let swarmRef: String?
     let bundleHash: String
+    /// KMS co-signature on bundleHash. Backend returns it whether or not
+    /// a scene was uploaded — both paths produce a cosmoSig.
+    let cosmoSig: String?
 }
 
 struct MintRequest: Encodable {

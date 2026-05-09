@@ -14,20 +14,23 @@ export const uploadRouter: RouterT = Router();
 
 /**
  * POST /api/upload — multipart/form-data
- *   - bundle: application/json (the ProofBundle bytes, opaque to backend)
- *   - scene: binary scene (USDZ / GLB / PLY)
- *   - audio: optional binary (m4a) — visible-nonce audio binding
+ *   - bundle: application/json (REQUIRED, the ProofBundle bytes, opaque to backend)
+ *   - scene:  binary scene (OPTIONAL, USDZ / GLB / PLY)
+ *   - audio:  optional binary (m4a) — visible-nonce audio binding
  *
- * The bundle is treated as opaque bytes: we hash it via SHA-256 (matching
- * iOS's ProofHasher.canonicalEncode + SHA-256) and pin it to storage. This
- * keeps the wire shape neutral about the bundle's schema.
+ * Scene is OPTIONAL so iOS can use this endpoint for cosign-only when
+ * the scene is too big for Vercel's 4.5 MB body limit. In that path,
+ * iOS uploads the scene directly to the Bee node (which has no such
+ * limit) and threads the resulting swarmRef into /api/mint. iOS still
+ * POSTs the bundle here so the backend can produce bundleHash +
+ * cosmoSig — the two things only the backend can do.
  *
  * Steps:
  *   1. SHA-256 the bundle bytes → bundleHash
  *   2. KMS-cosign that hash via secp256k1 → cosmoSig
- *   3. Pin scene + bundle (and audio if present) to Pinata/Swarm
- *   4. Return iOS-canonical fields { swarmRef, bundleHash } plus
- *      additive fields the viewer reads
+ *   3. Pin bundle (always); also pin scene + audio if the client sent them
+ *   4. Return iOS-canonical fields. swarmRef is null when caller
+ *      uploaded the scene out-of-band.
  */
 uploadRouter.post(
   "/",
@@ -43,7 +46,6 @@ uploadRouter.post(
       const sceneFile = files?.scene?.[0];
       const audioFile = files?.audio?.[0];
       if (!bundleFile) throw new ApiError("INVALID_BUNDLE", 'multipart "bundle" part is required');
-      if (!sceneFile) throw new ApiError("INVALID_BUNDLE", 'multipart "scene" part is required');
 
       const bundleHashHex = ("0x" +
         createHash("sha256").update(bundleFile.buffer).digest("hex")) as `0x${string}`;
@@ -51,13 +53,14 @@ uploadRouter.post(
       const cosmoSig = await cosignBundle(bundleHashHex);
 
       // Pass through filename + mimetype so Bee/Pinata serve the file
-      // with proper Content-Type + Content-Disposition. Otherwise the
-      // gateway returns a nameless application/octet-stream blob that
-      // browsers can't preview and macOS can't double-click open.
-      const sceneMime = sceneFile.mimetype || mimeFromName(sceneFile.originalname);
+      // with proper Content-Type + Content-Disposition.
+      const sceneMime = sceneFile?.mimetype || (sceneFile && mimeFromName(sceneFile.originalname));
       const audioMime = audioFile?.mimetype || (audioFile && mimeFromName(audioFile.originalname));
+
       const [scenePin, bundlePin, audioPin] = await Promise.all([
-        uploadToSwarm(new Uint8Array(sceneFile.buffer), sceneFile.originalname, sceneMime),
+        sceneFile
+          ? uploadToSwarm(new Uint8Array(sceneFile.buffer), sceneFile.originalname, sceneMime)
+          : Promise.resolve(null),
         uploadToSwarm(new Uint8Array(bundleFile.buffer), "bundle.json", "application/json"),
         audioFile
           ? uploadToSwarm(new Uint8Array(audioFile.buffer), audioFile.originalname, audioMime)
@@ -66,12 +69,12 @@ uploadRouter.post(
 
       res.json({
         // iOS-canonical fields
-        swarmRef: scenePin.reference,
+        swarmRef: scenePin?.reference ?? null,
         bundleHash: bundleHashHex,
         // additive fields used by the viewer + camera-agent
         bundleRef: bundlePin.reference,
         audioRef: audioPin?.reference ?? null,
-        sceneBytes: scenePin.sizeBytes,
+        sceneBytes: scenePin?.sizeBytes ?? null,
         cosmoSig,
       });
     } catch (e) {

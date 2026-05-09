@@ -39,12 +39,21 @@
 	<string>Proof of Reality talks to a local relay (your laptop on the same Wi-Fi) during development and demos.</string>
 
 	<!-- ===== App Transport Security =====
-	     Required so iOS allows http:// to a private-IP relay during demos.
-	     NSAllowsLocalNetworking permits cleartext to RFC1918 / .local hosts
-	     while keeping ATS strict for everything else (api.vercel.app etc). -->
+	     We talk to:
+	       - Vercel relay over HTTPS (no exception needed)
+	       - A self-hosted Bee node at http://<vps-ip>:1633 for big-scene
+	         direct uploads (Vercel's body cap doesn't fit a 10 MB USDZ).
+	     NSAllowsLocalNetworking covers laptop-local relays at 192.168.* / .local;
+	     NSAllowsArbitraryLoads is required for the public-IP Bee node since
+	     iOS doesn't accept bare IPs in NSExceptionDomains for production builds.
+	     If you put Bee behind a TLS-terminating reverse proxy with a domain
+	     name later, drop NSAllowsArbitraryLoads and use NSExceptionDomains
+	     scoped to that hostname only. -->
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsLocalNetworking</key>
+		<true/>
+		<key>NSAllowsArbitraryLoads</key>
 		<true/>
 		<key>NSAllowsArbitraryLoadsInWebContent</key>
 		<true/>
