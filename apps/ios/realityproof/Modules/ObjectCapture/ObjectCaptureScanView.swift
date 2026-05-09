@@ -13,24 +13,31 @@ struct ObjectCaptureScanView: View {
         ZStack {
             Color.black.ignoresSafeArea()
 
-            if let session = controller.captureSession, !isPostCapture {
-                ObjectCaptureView(session: session).ignoresSafeArea()
-            } else if controller.phase == .idle {
-                idleOverlay
-            } else if isProcessing {
-                processingOverlay
-            } else if isFinished {
-                finishedOverlay
-            }
+            // Once `summary` is set we've pushed ProofSummaryView on top.
+            // Drop ALL of this view's content so it just renders an empty
+            // black backdrop — when the user pops the summary, the
+            // .onChange(of: summary) handler dismisses us instantly with
+            // no "Proof bundle built" flash in between.
+            if summary == nil {
+                if let session = controller.captureSession, !isPostCapture {
+                    ObjectCaptureView(session: session).ignoresSafeArea()
+                } else if controller.phase == .idle {
+                    idleOverlay
+                } else if isProcessing {
+                    processingOverlay
+                } else if isFinished {
+                    finishedOverlay
+                }
 
-            if isNativeCoachingActive {
-                topAnchoredControls
-            } else {
-                VStack {
-                    Spacer()
-                    bottomBar
-                        .padding(.horizontal, 16)
-                        .padding(.bottom, 32)
+                if isNativeCoachingActive {
+                    topAnchoredControls
+                } else {
+                    VStack {
+                        Spacer()
+                        bottomBar
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 32)
+                    }
                 }
             }
         }

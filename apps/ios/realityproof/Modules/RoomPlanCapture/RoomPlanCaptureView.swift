@@ -12,34 +12,42 @@ struct RoomPlanCaptureView: View {
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
-            RoomCaptureRepresentable(controller: controller).ignoresSafeArea()
 
-            if controller.phase == .idle && proof.phase != .fetchingNonce {
-                idleOverlay
-            }
+            // Once `summary` is set ProofSummaryView is on top of us. Hide
+            // every overlay so popping the summary doesn't briefly reveal
+            // a "Proof bundle built" card (the .onChange handler below
+            // dismisses us instantly, but the SwiftUI pop animation would
+            // otherwise expose this view's contents for ~150 ms).
+            if summary == nil {
+                RoomCaptureRepresentable(controller: controller).ignoresSafeArea()
 
-            if controller.phase == .scanning {
-                VStack(spacing: 12) {
-                    HStack(alignment: .top) {
-                        TorchButton(torch: torch)
-                        Spacer()
-                        if let nonce = proof.nonce?.nonce {
-                            NonceQR(nonce: nonce, size: 96)
-                        }
-                    }
-                    actionButton("Done Scanning", system: "stop.circle.fill") {
-                        controller.finish()
-                    }
-                    Spacer()
+                if controller.phase == .idle && proof.phase != .fetchingNonce {
+                    idleOverlay
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 16)
-            } else {
-                VStack {
-                    Spacer()
-                    bottomBar
-                        .padding(.horizontal, 16)
-                        .padding(.bottom, 32)
+
+                if controller.phase == .scanning {
+                    VStack(spacing: 12) {
+                        HStack(alignment: .top) {
+                            TorchButton(torch: torch)
+                            Spacer()
+                            if let nonce = proof.nonce?.nonce {
+                                NonceQR(nonce: nonce, size: 96)
+                            }
+                        }
+                        actionButton("Done Scanning", system: "stop.circle.fill") {
+                            controller.finish()
+                        }
+                        Spacer()
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 16)
+                } else {
+                    VStack {
+                        Spacer()
+                        bottomBar
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 32)
+                    }
                 }
             }
         }
