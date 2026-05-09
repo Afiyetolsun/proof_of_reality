@@ -70,13 +70,10 @@ export async function runVerification(proof: unknown): Promise<VerificationCheck
   // failure. The on-chain anchor above is the real source of truth.
 
   if (!p.bundleRef || p.bundleRef.startsWith("local:")) {
-    checks.push({
-      name: "Off-chain bundle re-derivation",
-      ok: true,
-      kind: "info",
-      detail:
-        "bundleRef is local:<hash> — bundle was kept device-side at mint time. On-chain commitments above still verify the proof; once the bundle is published to Swarm, satellite + device + visible-nonce checks become available too.",
-    });
+    // Bundle was kept device-side at mint time. Don't render an
+    // explanatory row — the on-chain checks above already prove the
+    // proof. Surfacing "we can't fetch a thing that's not there" was
+    // confusing readers into thinking something failed.
     return checks;
   }
 

@@ -104,13 +104,12 @@ export function ProofScene({ url, attestor }: Props) {
 function GlbCard({ url, attestor }: { url: string; attestor?: string }) {
   return (
     <section className="scene-card">
-      {/* Lazy-load model-viewer ONLY when we actually have a GLB to
-          render. USDZ pages don't load it (it can't render USDZ in
-          canvas anyway), saving ~400 KB of JS + sidestepping a stack
-          of model-viewer warnings/errors when no model is mounted. */}
+      {/* Self-hosted model-viewer (instead of the googleapis CDN) so
+          it isn't blocked by Cross-Origin-Embedder-Policy on this
+          isolated route. Same script, same version, just same-origin. */}
       <Script
         type="module"
-        src="https://ajax.googleapis.com/ajax/libs/model-viewer/4.0.0/model-viewer.min.js"
+        src="/model-viewer.min.js"
         strategy="lazyOnload"
       />
       {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}

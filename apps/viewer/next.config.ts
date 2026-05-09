@@ -22,6 +22,27 @@ const config: NextConfig = {
     };
     return cfg;
   },
+  // CORP headers on the resources the isolated /<name> route fetches
+  // under COEP. The COOP+COEP themselves are set by middleware.ts so
+  // we can match /<name> with dots in it (Next.js header `source`
+  // patterns can't easily exclude file-extension paths AND match
+  // dotted ENS names).
+  async headers() {
+    return [
+      {
+        source: "/api/scene",
+        headers: [{ key: "Cross-Origin-Resource-Policy", value: "same-origin" }],
+      },
+      {
+        source: "/usd/:file*",
+        headers: [{ key: "Cross-Origin-Resource-Policy", value: "same-origin" }],
+      },
+      {
+        source: "/model-viewer.min.js",
+        headers: [{ key: "Cross-Origin-Resource-Policy", value: "same-origin" }],
+      },
+    ];
+  },
 };
 
 export default config;

@@ -15,7 +15,7 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import { USDZLoader } from "three/examples/jsm/loaders/USDZLoader.js";
+import { USDZLoader } from "three-usdz-loader";
 
 interface Props {
   url: string;
@@ -72,22 +72,27 @@ export function UsdzCanvas({ url }: Props) {
     controls.maxDistance = 50;
 
     // ---- 4. Load the USDZ ----
-    // Using three.js's official USDZLoader — pure JS, no WASM, no
-    // SharedArrayBuffer requirement, no COOP/COEP headers needed.
-    // Unzips the USDZ container with fflate and parses the USDC
-    // binary directly. Handles geometry + textures + basic PBR.
-    const loader = new USDZLoader();
-    let loaded: THREE.Group | null = null;
+    // Pixar's USD compiled to WASM (via three-usdz-loader). Handles
+    // the full USD spec — works on every USDZ I've thrown at it,
+    // including ones three.js's pure-JS USDZLoader chokes on.
+    //
+    // WASM bundle is in /public/usd/, served same-origin under our
+    // COOP+COEP isolated /<name> route so SharedArrayBuffer works.
+    // The loader auto-finds the WASM relative to the page origin.
+    const loader = new USDZLoader("/usd");
+    const groupHolder = new THREE.Group();
+    scene.add(groupHolder);
 
     (async () => {
       try {
         const res = await fetch(url);
         if (!res.ok) throw new Error(`fetch ${res.status}`);
-        const buf = await res.arrayBuffer();
+        const blob = await res.blob();
         if (disposed) return;
-        loaded = loader.parse(buf);
-        scene.add(loaded);
-        frameCamera(loaded, camera, controls);
+        const file = new File([blob], "scene.usdz", { type: "model/vnd.usdz+zip" });
+        await loader.loadFile(file, groupHolder);
+        if (disposed) return;
+        frameCamera(groupHolder, camera, controls);
         setStatus("ready");
       } catch (e) {
         if (disposed) return;
