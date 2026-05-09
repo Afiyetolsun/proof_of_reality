@@ -4,28 +4,35 @@ import { contentDirectUrl, ensAppForName, viewerForName } from "@/lib/viewer-lin
 import { Eyebrow } from "./Eyebrow";
 import { Mono, shortHex, shortAddress } from "./Mono";
 import { CardThumbnail } from "./CardThumbnail";
+import { CardScene } from "./CardScene";
 
 export function Card({ record }: { record: SubnameRecord }) {
   const captureLabel = formatCapture(record.capturedAt ?? record.createdAt);
   const viewerHref = viewerForName(record.name);
+  const sceneUrl = record.content
+    ? `/api/scene?proto=${record.content.protocol}&ref=${encodeURIComponent(record.content.ref)}`
+    : null;
 
   return (
     <article className="group relative flex flex-col overflow-hidden border border-[--color-rule] bg-[--color-surface-raised] transition-colors hover:border-[--color-signal-soft]">
-      <Link
-        href={viewerHref}
-        target="_blank"
-        rel="noreferrer"
-        className="block focus:outline-none"
-        aria-label={`Verify ${record.name}`}
-      >
-        <CardThumbnail
-          bundleHash={record.bundleHash}
-          contentRef={record.content?.ref ?? null}
-          label={record.labelName}
-        />
+      <div className="relative">
+        <Link
+          href={viewerHref}
+          prefetch
+          className="block focus:outline-none"
+          aria-label={`Verify ${record.name}`}
+        >
+          <CardThumbnail
+            bundleHash={record.bundleHash}
+            contentRef={record.content?.ref ?? null}
+            label={record.labelName}
+          />
+        </Link>
 
-        {/* Top-right pills: mode + token */}
-        <div className="pointer-events-none absolute right-3 top-3 flex flex-col items-end gap-2">
+        {sceneUrl && <CardScene url={sceneUrl} />}
+
+        {/* Top-right pills: mode + token (sit above CardScene's play button) */}
+        <div className="pointer-events-none absolute right-3 top-3 z-30 flex flex-col items-end gap-2">
           {record.mode && (
             <span className="rounded-full border border-[--color-rule] bg-[--color-surface-deep]/85 px-2 py-1 text-mono-xs uppercase tracking-[0.14em] text-[--color-ink-mute] backdrop-blur">
               {record.mode}
@@ -37,14 +44,13 @@ export function Card({ record }: { record: SubnameRecord }) {
             </span>
           )}
         </div>
-      </Link>
+      </div>
 
       <div className="flex flex-1 flex-col gap-3 px-4 pb-4 pt-4">
         <div className="flex items-baseline justify-between gap-3">
           <Link
             href={viewerHref}
-            target="_blank"
-            rel="noreferrer"
+            prefetch
             className="min-w-0 flex-1 text-h2 text-[--color-ink] underline decoration-transparent underline-offset-4 transition-colors hover:decoration-[--color-signal] focus:outline-none"
           >
             <span className="block truncate">{record.labelName}</span>
@@ -53,7 +59,7 @@ export function Card({ record }: { record: SubnameRecord }) {
         </div>
 
         <p className="text-mono-s text-[--color-ink-mute]">
-          <span className="opacity-70">{record.name.replace(record.labelName + ".", "")}</span>
+          <span className="opacity-70">.{record.name.replace(record.labelName + ".", "")}</span>
         </p>
 
         {record.description && (
@@ -103,14 +109,13 @@ export function Card({ record }: { record: SubnameRecord }) {
         </dl>
 
         <div className="flex items-center justify-between gap-3 border-t border-[--color-rule] pt-3 text-mono-xs">
-          <a
+          <Link
             href={viewerHref}
-            target="_blank"
-            rel="noreferrer"
+            prefetch
             className="text-[--color-signal] underline decoration-transparent underline-offset-4 transition-colors hover:decoration-[--color-signal]"
           >
             verify ↗
-          </a>
+          </Link>
           <a
             href={ensAppForName(record.name)}
             target="_blank"

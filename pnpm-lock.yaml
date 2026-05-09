@@ -72,6 +72,18 @@ importers:
 
   apps/gallery:
     dependencies:
+      '@proof-of-reality/attestation':
+        specifier: workspace:*
+        version: link:../../packages/attestation
+      '@proof-of-reality/contracts-abi':
+        specifier: workspace:*
+        version: link:../../packages/contracts-abi
+      '@proof-of-reality/proof-bundle':
+        specifier: workspace:*
+        version: link:../../packages/proof-bundle
+      '@proof-of-reality/verified-swarm-fetch':
+        specifier: workspace:*
+        version: link:../../packages/verified-swarm-fetch
       geist:
         specifier: ^1.3.1
         version: 1.7.0(next@15.5.18(react-dom@19.2.6(react@19.2.6))(react@19.2.6))
@@ -84,6 +96,12 @@ importers:
       react-dom:
         specifier: ^19.0.0
         version: 19.2.6(react@19.2.6)
+      three:
+        specifier: ^0.166.1
+        version: 0.166.1
+      three-usdz-loader:
+        specifier: ^1.0.9
+        version: 1.0.9(three@0.166.1)
       viem:
         specifier: 2.21.45
         version: 2.21.45(typescript@5.9.3)(zod@3.25.76)
@@ -103,6 +121,9 @@ importers:
       '@types/react-dom':
         specifier: ^19.0.0
         version: 19.2.3(@types/react@19.2.14)
+      '@types/three':
+        specifier: ^0.165.0
+        version: 0.165.0
       postcss:
         specifier: ^8.4.49
         version: 8.5.14

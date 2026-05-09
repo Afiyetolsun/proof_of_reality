@@ -1,16 +1,15 @@
-const VIEWER_BASE = process.env.NEXT_PUBLIC_VIEWER_BASE_URL ?? "http://localhost:3000";
 const ENS_APP_BASE =
   process.env.NEXT_PUBLIC_ENS_APP_BASE_URL ?? "https://sepolia.app.ens.domains";
 const SWARM_GATEWAY =
   process.env.NEXT_PUBLIC_SWARM_GATEWAY ?? "https://api.gateway.ethswarm.org";
 const PARENT_NAME = process.env.NEXT_PUBLIC_ENS_PARENT_NAME ?? "realityproof.eth";
 
-export const viewerHome = VIEWER_BASE;
 export const ensParentName = PARENT_NAME;
 export const ensAppParentUrl = `${ENS_APP_BASE}/${PARENT_NAME}?tab=subnames`;
 
+/** Same-origin link to the gallery's per-name detail page. */
 export function viewerForName(name: string): string {
-  return `${VIEWER_BASE}/${encodeURIComponent(name)}`;
+  return `/${encodeURIComponent(name)}`;
 }
 
 export function ensAppForName(name: string): string {

@@ -1,4 +1,4 @@
-import { ensAppParentUrl, ensParentName, viewerHome } from "@/lib/viewer-link";
+import { ensAppParentUrl, ensParentName } from "@/lib/viewer-link";
 
 export function Footer() {
   return (
@@ -17,14 +17,6 @@ export function Footer() {
           on eth-sepolia · subnames updated every 30s
         </span>
         <div className="flex items-center gap-5 text-mono-s text-[--color-ink-mute]">
-          <a
-            href={viewerHome}
-            target="_blank"
-            rel="noreferrer"
-            className="underline decoration-transparent underline-offset-4 hover:text-[--color-ink] hover:decoration-[--color-signal]"
-          >
-            viewer
-          </a>
           <a
             href="https://sepolia.basescan.org"
             target="_blank"
