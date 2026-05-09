@@ -11,9 +11,9 @@ export function Header() {
           href={viewerHome}
           target="_blank"
           rel="noreferrer"
-          className="text-[--color-ink-mute] underline decoration-transparent underline-offset-4 transition-colors hover:text-[--color-ink] hover:decoration-[--color-signal]"
+          className="text-[--color-signal] underline decoration-[--color-signal] underline-offset-4 transition-colors hover:decoration-2"
         >
-          verify
+          app ↗
         </a>
         <a
           href={architectureUrl}

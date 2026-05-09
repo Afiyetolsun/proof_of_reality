@@ -26,8 +26,8 @@ export function Footer() {
           ["GitHub", githubUrl, true],
         ]} />
 
-        <FooterCol title="Verifier" links={[
-          ["Open gallery", viewerHome, true],
+        <FooterCol title="App" links={[
+          ["Open the app", viewerHome, true],
           [`${ensParentName} on ENS`, ensAppParentUrl, true],
           ["Base Sepolia", basescanUrl, true],
         ]} />
