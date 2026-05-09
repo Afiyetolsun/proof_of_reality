@@ -2,6 +2,10 @@
 
 import Script from "next/script";
 import { useEffect, useRef, useState } from "react";
+import * as THREE from "three";
+import { LineSegments2 } from "three/addons/lines/LineSegments2.js";
+import { LineMaterial } from "three/addons/lines/LineMaterial.js";
+import { LineSegmentsGeometry } from "three/addons/lines/LineSegmentsGeometry.js";
 
 interface Props {
   url: string;
@@ -117,27 +121,32 @@ function GlbCard({
   const isRoom = mode === "roomPlan" || mode === "room";
   const ref = useRef<HTMLElement | null>(null);
 
-  // Two material tweaks applied on GLB load to make RoomPlan scans
-  // render correctly:
+  // Architectural-diagram render for room scans. Lighting alone can't
+  // make a white-on-white room legible: PBR on uniform-color planar
+  // surfaces gives identical brightness on both sides of a corner, so
+  // the seam is literally not in the image. Three things together fix
+  // it:
   //
-  // 1. Double-sided rendering. RoomPlan exports walls as single-sided
-  //    planes facing inward; without this, the auto-framed camera
-  //    sitting outside the bounding box sees only backfaces and the
-  //    room collapses to a floor plane.
+  // 1. Per-face shading. We compute a face normal for every triangle
+  //    in every mesh and write a per-vertex color based on that normal:
+  //    floor (normal up) → warm beige, ceiling (normal down) → cool
+  //    grey, walls → calm tones varying by horizontal facing. We then
+  //    swap the mesh's material for a flat MeshBasicMaterial with
+  //    vertexColors = true, so each face renders its own shade.
+  //    No more white-on-white.
   //
-  // 2. Polygon offset. RoomPlan's USD also emits overlapping coplanar
-  //    geometry (e.g. wall+ceiling sharing the exact same edge plane,
-  //    inner+outer wall faces at near-identical depth), and Blender's
-  //    USD→GLB doesn't dedupe it. Two surfaces fighting for the same
-  //    pixel produces the white-flickering "stuck" texels along corners
-  //    you've been seeing — that's z-fighting. polygonOffset nudges
-  //    depth values by a slope-proportional amount, breaking the tie
-  //    cleanly. We reach into model-viewer's underlying three.js
-  //    Material via its internal symbol; best effort, fails silently
-  //    if the API moves between versions.
+  // 2. Bold edge overlay using Line2/LineMaterial — Three.js's
+  //    screen-space-thick line primitive. Plain LineSegments uses
+  //    WebGL gl.LINES which is capped at 1px on every desktop browser
+  //    and was invisible at distance. Line2 renders lines as
+  //    camera-facing quads, so we can ask for 3 px and actually get
+  //    3 px. Edges are extracted at a 22° angle threshold — corners,
+  //    doors, window frames pop; coplanar triangle seams stay quiet.
   //
-  // Both are safe no-ops for object captures (closed-hull meshes with
-  // no coplanar duplicates), so we apply them unconditionally.
+  // 3. Polygon offset + double-sided + back to PBR for object captures.
+  //    Object scans with photogrammetry textures don't get the
+  //    architectural treatment — they keep their PBR materials and
+  //    just get the safety surgeries (doubleSided, polygonOffset).
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
@@ -163,8 +172,161 @@ function GlbCard({
             tm.needsUpdate = true;
           }
         }
+
+        if (!isRoom) return;
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const root: THREE.Object3D | null =
+          mv[Symbol.for("scene")] ??
+          mv[Symbol.for("threeScene")] ??
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (mv.model as any)?.[Symbol.for("model")] ??
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (mv.model as any)?.modelContainer ??
+          null;
+        if (!root || typeof root.traverse !== "function") {
+          console.warn("[scene] couldn't find three.js root in model-viewer");
+          return;
+        }
+
+        // Calm architectural palette. Each pair of perpendicular
+        // surfaces ends up in a different bucket, so corners always
+        // show a tonal step.
+        const FLOOR: [number, number, number] = [0.86, 0.80, 0.70];
+        const CEILING: [number, number, number] = [0.62, 0.66, 0.72];
+        const WALLS: [number, number, number][] = [
+          [0.94, 0.94, 0.96],
+          [0.78, 0.82, 0.86],
+          [0.88, 0.86, 0.82],
+          [0.82, 0.85, 0.80],
+        ];
+        const colorForNormal = (
+          nx: number,
+          ny: number,
+          nz: number,
+        ): [number, number, number] => {
+          if (ny > 0.7) return FLOOR;
+          if (ny < -0.7) return CEILING;
+          // Horizontal walls — bin by atan2(z, x) into 4 buckets so
+          // adjacent walls (90° apart) always land in different bins.
+          const angle = Math.atan2(nz, nx);
+          const bin = ((Math.floor(((angle + Math.PI) / (2 * Math.PI)) * 4) %
+            4) +
+            4) %
+            4;
+          return WALLS[bin]!;
+        };
+
+        // We need the renderer canvas size for Line2 resolution.
+        const canvas = mv.shadowRoot?.querySelector("canvas") as
+          | HTMLCanvasElement
+          | undefined;
+        const resolution = new THREE.Vector2(
+          canvas?.width ?? 1280,
+          canvas?.height ?? 720,
+        );
+
+        const lineMat = new LineMaterial({
+          color: 0x0a0d12, // near-black; reads as ink against any wall
+          linewidth: 3, // pixels
+          worldUnits: false,
+          transparent: true,
+          opacity: 1,
+          depthTest: true,
+          resolution,
+        });
+
+        root.traverse((child: THREE.Object3D) => {
+          const mesh = child as THREE.Mesh;
+          if (!mesh.isMesh || !mesh.geometry) return;
+          if (mesh.userData._archified) return;
+
+          const geom = mesh.geometry as THREE.BufferGeometry;
+          const pos = geom.getAttribute("position") as THREE.BufferAttribute;
+          if (!pos) return;
+
+          // Compute per-vertex colors from face normals. To get a flat
+          // (one-color-per-face) look we'd need un-shared vertices;
+          // RoomPlan walls don't share vertices across different walls
+          // anyway, so writing the face color to each of the
+          // triangle's three vertices works in practice.
+          const colors = new Float32Array(pos.count * 3);
+          const va = new THREE.Vector3();
+          const vb = new THREE.Vector3();
+          const vc = new THREE.Vector3();
+          const ab = new THREE.Vector3();
+          const ac = new THREE.Vector3();
+          const normal = new THREE.Vector3();
+
+          const writeFace = (a: number, b: number, c: number) => {
+            va.fromBufferAttribute(pos, a);
+            vb.fromBufferAttribute(pos, b);
+            vc.fromBufferAttribute(pos, c);
+            ab.subVectors(vb, va);
+            ac.subVectors(vc, va);
+            normal.crossVectors(ab, ac).normalize();
+            const [r, g, bl] = colorForNormal(normal.x, normal.y, normal.z);
+            for (const vi of [a, b, c]) {
+              colors[vi * 3] = r;
+              colors[vi * 3 + 1] = g;
+              colors[vi * 3 + 2] = bl;
+            }
+          };
+
+          const idx = geom.index;
+          if (idx) {
+            for (let i = 0; i < idx.count; i += 3) {
+              writeFace(idx.getX(i), idx.getX(i + 1), idx.getX(i + 2));
+            }
+          } else {
+            for (let i = 0; i < pos.count; i += 3) {
+              writeFace(i, i + 1, i + 2);
+            }
+          }
+
+          geom.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+
+          // Swap PBR for a flat unlit material so our per-face colors
+          // aren't re-lit by IBL (which would just average them back
+          // toward white). Side: DoubleSide because RoomPlan walls
+          // face inward.
+          mesh.material = new THREE.MeshBasicMaterial({
+            vertexColors: true,
+            side: THREE.DoubleSide,
+          });
+
+          // Bold edge overlay via Line2 (renders thick screen-space
+          // lines, unlike LineBasicMaterial which is gl.LINES = 1px).
+          const edgesGeom = new THREE.EdgesGeometry(geom, 22);
+          const lineGeom = new LineSegmentsGeometry().fromEdgesGeometry(
+            edgesGeom,
+          );
+          // LineSegments2 (not Line2) is the right pair for
+          // LineSegmentsGeometry — Line2 expects LineGeometry, which is
+          // a continuous polyline, not the disjoint segment pairs that
+          // EdgesGeometry produces.
+          const line = new LineSegments2(lineGeom, lineMat);
+          line.computeLineDistances();
+          line.userData._edgeOverlay = true;
+          // renderOrder pushes the lines to draw after the surface so
+          // they sit cleanly on top.
+          line.renderOrder = 999;
+          mesh.add(line);
+
+          mesh.userData._archified = true;
+        });
+
+        // Keep Line2 looking right when the canvas resizes.
+        const ro =
+          typeof ResizeObserver !== "undefined"
+            ? new ResizeObserver(() => {
+                if (!canvas) return;
+                lineMat.resolution.set(canvas.width, canvas.height);
+              })
+            : null;
+        if (canvas && ro) ro.observe(canvas);
       } catch (e) {
-        console.warn("[scene] post-load material tweak failed", e);
+        console.warn("[scene] post-load surgery failed", e);
       }
     };
     el.addEventListener("load", onLoad);
@@ -172,7 +334,7 @@ function GlbCard({
       cancelled = true;
       el.removeEventListener("load", onLoad);
     };
-  }, [url]);
+  }, [url, isRoom]);
 
   return (
     <div className="overflow-hidden rounded-[20px] border border-[--color-rule] bg-[--color-surface-raised] p-2">

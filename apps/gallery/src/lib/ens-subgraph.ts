@@ -130,3 +130,60 @@ export async function listSubnames(
   }
   return out;
 }
+
+/**
+ * Map a list of subname namehashes back to their human label. Used by
+ * ens-resolver.ts ONLY for user-supplied labels (default vin- labels
+ * are derived locally from bundleHash). Subgraph `domains.id` is the
+ * lower-case-hex namehash of the FQDN.
+ */
+const NODES_QUERY = /* GraphQL */ `
+  query NodesById($ids: [ID!]!) {
+    domains(where: { id_in: $ids }, first: 1000) {
+      id
+      name
+      labelName
+    }
+  }
+`;
+
+interface NodesQueryResponse {
+  data?: {
+    domains: Array<{
+      id: string;
+      name: string | null;
+      labelName: string | null;
+    }>;
+  };
+  errors?: Array<{ message: string }>;
+}
+
+export async function lookupLabelsByNode(
+  nodes: Hex[],
+): Promise<Map<Hex, { name: string; labelName: string }>> {
+  const out = new Map<Hex, { name: string; labelName: string }>();
+  if (nodes.length === 0) return out;
+
+  const ids = nodes.map((n) => n.toLowerCase());
+
+  const res = await fetch(SUBGRAPH_URL, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      query: NODES_QUERY,
+      variables: { ids },
+    }),
+    next: { revalidate: 30 },
+  });
+  if (!res.ok) throw new Error(`ENS subgraph HTTP ${res.status}`);
+  const json = (await res.json()) as NodesQueryResponse;
+  if (json.errors?.length) {
+    throw new Error(`ENS subgraph: ${json.errors.map((e) => e.message).join("; ")}`);
+  }
+
+  for (const d of json.data?.domains ?? []) {
+    if (!d.name || !d.labelName) continue;
+    out.set(d.id.toLowerCase() as Hex, { name: d.name, labelName: d.labelName });
+  }
+  return out;
+}
