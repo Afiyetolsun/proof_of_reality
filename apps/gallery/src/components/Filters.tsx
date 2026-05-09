@@ -42,7 +42,7 @@ function buildHref(state: FilterState, override: Partial<FilterState>): string {
 
 export function Filters({ state, total }: { state: FilterState; total: number }) {
   return (
-    <div className="container-page mt-2 flex flex-wrap items-center gap-x-6 gap-y-3 pb-2">
+    <div className="mt-2 flex flex-wrap items-center gap-x-6 gap-y-3 pb-2">
       <span className="text-mono-s text-[--color-ink-mute]">
         {total} {total === 1 ? "scan" : "scans"}
       </span>
@@ -109,7 +109,7 @@ function Pill({
       scroll={false}
       className={`rounded-full px-3 py-1 text-mono-xs transition-colors ${
         active
-          ? "bg-[--color-signal-soft] text-[--color-signal]"
+          ? "bg-[--color-accent-soft] text-[--color-accent]"
           : "text-[--color-ink-mute] hover:text-[--color-ink]"
       }`}
     >

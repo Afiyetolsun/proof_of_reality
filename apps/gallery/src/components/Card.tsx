@@ -14,7 +14,7 @@ export function Card({ record }: { record: SubnameRecord }) {
     : null;
 
   return (
-    <article className="group relative flex flex-col overflow-hidden border border-[--color-rule] bg-[--color-surface-raised] transition-colors hover:border-[--color-signal-soft]">
+    <article className="group relative flex flex-col overflow-hidden rounded-[20px] border border-[--color-rule] bg-[--color-surface-raised] transition-colors hover:border-[--color-accent-soft]">
       <div className="relative">
         <Link
           href={viewerHref}
@@ -31,7 +31,9 @@ export function Card({ record }: { record: SubnameRecord }) {
 
         {sceneUrl && <CardScene url={sceneUrl} detailHref={viewerHref} />}
 
-        {/* Top-right pills: mode + token (sit above CardScene's play button) */}
+        {/* Top-right pills: mode + token. The token pill keeps the
+            signal-orange accent — it's the one place we use the warm
+            tone from the brand icon to mark "this scan is on-chain". */}
         <div className="pointer-events-none absolute right-3 top-3 z-30 flex flex-col items-end gap-2">
           {record.mode && (
             <span className="rounded-full border border-[--color-rule] bg-[--color-surface-deep]/85 px-2 py-1 text-mono-xs uppercase tracking-[0.14em] text-[--color-ink-mute] backdrop-blur">
@@ -51,7 +53,7 @@ export function Card({ record }: { record: SubnameRecord }) {
           <Link
             href={viewerHref}
             prefetch
-            className="min-w-0 flex-1 text-h2 text-[--color-ink] underline decoration-transparent underline-offset-4 transition-colors hover:decoration-[--color-signal] focus:outline-none"
+            className="min-w-0 flex-1 text-h2 text-[--color-ink] underline decoration-transparent underline-offset-4 transition-colors hover:decoration-[--color-accent] focus:outline-none"
           >
             <span className="block truncate">{record.labelName}</span>
           </Link>
@@ -71,9 +73,9 @@ export function Card({ record }: { record: SubnameRecord }) {
         <dl className="mt-auto grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 pt-2">
           {record.bundleHash && (
             <>
-              <dt className="text-mono-xs text-[--color-ink-faint]">bundle</dt>
+              <dt className="text-mono-xs text-[--color-accent]">bundle</dt>
               <dd>
-                <Mono className="text-mono-xs" title={record.bundleHash}>
+                <Mono className="text-mono-xs text-[--color-ink]" title={record.bundleHash}>
                   {shortHex(record.bundleHash, 6, 6)}
                 </Mono>
               </dd>
@@ -81,9 +83,9 @@ export function Card({ record }: { record: SubnameRecord }) {
           )}
           {record.attestor && (
             <>
-              <dt className="text-mono-xs text-[--color-ink-faint]">attestor</dt>
+              <dt className="text-mono-xs text-[--color-accent]">attestor</dt>
               <dd>
-                <Mono className="text-mono-xs" title={record.attestor}>
+                <Mono className="text-mono-xs text-[--color-ink]" title={record.attestor}>
                   {shortAddress(record.attestor)}
                 </Mono>
               </dd>
@@ -91,14 +93,13 @@ export function Card({ record }: { record: SubnameRecord }) {
           )}
           {record.content && (
             <>
-              <dt className="text-mono-xs text-[--color-ink-faint]">{record.content.protocol}</dt>
+              <dt className="text-mono-xs text-[--color-accent]">{record.content.protocol}</dt>
               <dd>
                 <a
                   href={contentDirectUrl(record.content)}
                   target="_blank"
                   rel="noreferrer"
-                  onClick={(e) => e.stopPropagation()}
-                  className="text-mono-xs text-[--color-ink] underline decoration-transparent underline-offset-4 transition-colors hover:decoration-[--color-signal] hover:text-[--color-signal]"
+                  className="text-mono-xs text-[--color-link] underline decoration-transparent underline-offset-4 transition-colors hover:decoration-[--color-link]"
                   title={record.content.ref}
                 >
                   {shortHex(record.content.ref, 6, 6)} ↗
@@ -112,7 +113,7 @@ export function Card({ record }: { record: SubnameRecord }) {
           <Link
             href={viewerHref}
             prefetch
-            className="text-[--color-signal] underline decoration-transparent underline-offset-4 transition-colors hover:decoration-[--color-signal]"
+            className="text-[--color-accent] underline decoration-transparent underline-offset-4 transition-colors hover:decoration-[--color-accent]"
           >
             verify ↗
           </Link>
@@ -120,7 +121,7 @@ export function Card({ record }: { record: SubnameRecord }) {
             href={ensAppForName(record.name)}
             target="_blank"
             rel="noreferrer"
-            className="text-[--color-ink-mute] transition-colors hover:text-[--color-ink]"
+            className="text-[--color-link] transition-colors hover:opacity-80"
           >
             ens ↗
           </a>

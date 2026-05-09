@@ -75,9 +75,18 @@ export default async function NamePage({ params }: PageProps) {
   return (
     <main
       id="content"
-      className="mx-auto flex max-w-[880px] flex-col gap-6 px-5 pb-20 pt-8"
+      className="mx-auto flex max-w-[880px] flex-col gap-6 px-5 pb-20 pt-6"
     >
-      <header className="px-2 pb-2 pt-6 text-center">
+      <nav>
+        <Link
+          href="/"
+          className="text-mono-s text-[--color-ink-mute] transition-colors hover:text-[--color-ink]"
+        >
+          ← Proof of Reality
+        </Link>
+      </nav>
+
+      <header className="px-2 pb-2 text-center">
         <h1 className="m-0 break-all font-mono text-display-m text-[--color-ink]">
           {record.name}
         </h1>
@@ -204,13 +213,7 @@ export default async function NamePage({ params }: PageProps) {
         </dl>
       </section>
 
-      <footer className="mt-2 flex items-center justify-between border-t border-[--color-rule] pt-4 text-mono-s">
-        <Link
-          href="/"
-          className="text-[--color-ink-mute] transition-colors hover:text-[--color-ink]"
-        >
-          ← Proof of Reality
-        </Link>
+      <footer className="mt-2 flex items-center justify-end border-t border-[--color-rule] pt-4 text-mono-s">
         <a
           href={`${ensAppBase}/${record.name}`}
           target="_blank"

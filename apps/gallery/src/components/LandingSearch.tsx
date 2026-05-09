@@ -33,13 +33,18 @@ export function LandingSearch() {
         autoCapitalize="off"
         autoCorrect="off"
         spellCheck={false}
-        className="min-w-0 flex-1 border border-[--color-rule] bg-[--color-surface-raised] px-4 py-3 text-mono-s text-[--color-ink] placeholder:text-[--color-ink-faint] focus:border-[--color-signal] focus:outline-none"
+        className="min-w-0 flex-1 rounded-full border border-[--color-rule] bg-[--color-surface-raised] px-5 py-3 text-mono-s text-[--color-ink] placeholder:text-[--color-ink-faint] focus:border-[--color-accent] focus:outline-none"
       />
       <button
         type="submit"
-        className="whitespace-nowrap bg-[--color-signal] px-5 py-3 text-mono-s font-semibold text-[--color-surface-deep] transition-opacity hover:opacity-90"
+        className="whitespace-nowrap rounded-full px-6 py-3 text-mono-s font-semibold transition-transform hover:translate-y-[-1px] active:translate-y-0"
+        style={{
+          background: "var(--color-accent)",
+          color: "var(--color-accent-fg)",
+          boxShadow: "0 8px 28px var(--color-accent-soft)",
+        }}
       >
-        verify ↗
+        Verify
       </button>
     </form>
   );

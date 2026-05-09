@@ -1,11 +1,24 @@
+/**
+ * Gallery landing.
+ *
+ * Layout intentionally mirrors apps/gallery/src/app/[name]/page.tsx
+ * (centered diamond + mono hero, single-column tagline + search, then
+ * filters and the card grid below). The site-wide Header / Footer
+ * chrome from src/components/* is dropped here so the index and the
+ * detail pages share one visual voice.
+ *
+ * The orange diamond ◆ is the "little orange from our icon" — used
+ * sparingly so the page reads mint/sky/white with a single warm accent
+ * holding the brand.
+ */
 import { Suspense } from "react";
+import Link from "next/link";
 import { listSubnames } from "@/lib/ens-subgraph";
 import { hydrateRecords, type SubnameRecord } from "@/lib/ens-records";
-import { Header } from "@/components/Header";
-import { Footer } from "@/components/Footer";
+import { isResolverConfigured, listProofsFromResolver } from "@/lib/ens-resolver";
 import { Card } from "@/components/Card";
 import { Filters, parseFilters, type FilterState } from "@/components/Filters";
-import { ensAppParentUrl } from "@/lib/viewer-link";
+import { ensAppParentUrl, ensParentName } from "@/lib/viewer-link";
 import { LandingSearch } from "@/components/LandingSearch";
 
 interface PageProps {
@@ -17,47 +30,72 @@ export default async function GalleryPage({ searchParams }: PageProps) {
   const filters = parseFilters(sp);
 
   return (
-    <>
-      <Header />
-      <main id="content" className="pb-12">
-        {/* Hero: same monospace + diamond-icon vibe as the per-proof page,
-            centered and tight. Short tagline mirrors the per-proof page
-            ("Cryptographic capture of physical reality. Verified by four
-            independent witnesses.") so visitors hitting the index get the
-            same one-line claim before they click into a single proof. */}
-        <section className="container-page pb-10 pt-12 text-center md:pt-20">
-          <div
-            aria-hidden
-            className="mx-auto text-[40px] leading-none text-[--color-signal]"
-            style={{ filter: "drop-shadow(0 0 18px oklch(0.74 0.14 58 / 0.40))" }}
+    <main id="content" className="pb-20">
+      <section className="mx-auto max-w-[880px] px-5 pb-10 pt-16 text-center md:pt-20">
+        <div
+          aria-hidden
+          className="mx-auto text-[44px] leading-none text-[--color-signal]"
+          style={{ filter: "drop-shadow(0 0 22px oklch(0.74 0.14 58 / 0.55))" }}
+        >
+          ◆
+        </div>
+        <h1 className="mx-auto mt-5 max-w-[20ch] font-mono text-display-m text-[--color-ink]">
+          proof of reality
+        </h1>
+        <p className="mx-auto mt-4 max-w-[52ch] text-body text-[--color-ink]">
+          Cryptographic captures of the physical world. Each scan signed by
+          four independent witnesses.
+        </p>
+        <LandingSearch />
+        <p className="mx-auto mt-4 max-w-[52ch] text-mono-s text-[--color-ink-mute]">
+          Or browse every minted proof below — each card is a subname under{" "}
+          <a
+            href={ensAppParentUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="text-[--color-link] underline decoration-transparent underline-offset-4 hover:decoration-[--color-link]"
           >
-            ◆
-          </div>
-          <h1 className="mx-auto mt-5 max-w-[20ch] text-display-m font-mono text-[--color-ink]">
-            proof of reality
-          </h1>
-          <p className="mx-auto mt-4 max-w-[52ch] text-body text-[--color-ink-mute]">
-            Cryptographic captures of the physical world. Each scan signed by
-            four independent witnesses.
-          </p>
-          <LandingSearch />
-        </section>
+            {ensParentName} ↗
+          </a>
+          .
+        </p>
+      </section>
 
+      <div className="mx-auto max-w-[1280px] px-5">
         <Suspense fallback={<GalleryFallback filters={filters} />}>
           <GalleryBody filters={filters} />
         </Suspense>
-      </main>
-      <Footer />
-    </>
+      </div>
+
+      <footer className="mx-auto mt-16 flex max-w-[1280px] items-center justify-between border-t border-[--color-rule] px-5 pt-5 text-mono-s text-[--color-ink-mute]">
+        <span>Built for ETHPrague 2026 · SpaceComputer + ENS + Swarm</span>
+        <a
+          href="https://github.com/Afiyetolsun/proof_of_reality"
+          target="_blank"
+          rel="noreferrer"
+          className="text-[--color-link] transition-colors hover:opacity-80"
+        >
+          GitHub ↗
+        </a>
+      </footer>
+    </main>
   );
 }
 
 async function GalleryBody({ filters }: { filters: FilterState }) {
   let records: SubnameRecord[] = [];
   let error: string | null = null;
+  // Primary path: read ProofPublished events from the resolver contract.
+  // It's the source of truth for "what scans exist on ENS"; the subgraph
+  // is only a fallback for environments that haven't wired up the
+  // resolver address.
   try {
-    const subnames = await listSubnames({ first: 200 });
-    records = await hydrateRecords(subnames);
+    if (isResolverConfigured()) {
+      records = await listProofsFromResolver();
+    } else {
+      const subnames = await listSubnames({ first: 200 });
+      records = await hydrateRecords(subnames);
+    }
   } catch (e) {
     error = (e as Error).message;
   }
@@ -67,7 +105,7 @@ async function GalleryBody({ filters }: { filters: FilterState }) {
   return (
     <>
       <Filters state={filters} total={filtered.length} />
-      <section className="container-page pt-6">
+      <section className="pt-6">
         {error && <ErrorBlock message={error} />}
         {!error && filtered.length === 0 && <EmptyBlock />}
         {filtered.length > 0 && (
@@ -86,12 +124,12 @@ function GalleryFallback({ filters }: { filters: FilterState }) {
   return (
     <>
       <Filters state={filters} total={0} />
-      <section className="container-page pt-6">
+      <section className="pt-6">
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {Array.from({ length: 8 }).map((_, i) => (
             <div
               key={i}
-              className="aspect-[4/5] animate-pulse border border-[--color-rule] bg-[--color-surface-raised]"
+              className="aspect-[4/5] animate-pulse rounded-[20px] border border-[--color-rule] bg-[--color-surface-raised]"
             />
           ))}
         </div>
@@ -116,8 +154,10 @@ function applyFilters(records: SubnameRecord[], f: FilterState): SubnameRecord[]
 
 function ErrorBlock({ message }: { message: string }) {
   return (
-    <div className="border border-[--color-rule] bg-[--color-surface-raised] px-6 py-8">
-      <div className="text-eyebrow font-mono text-[--color-warn]">subgraph error</div>
+    <div className="rounded-[20px] border border-[--color-rule] bg-[--color-surface-raised] px-6 py-8">
+      <div className="text-eyebrow font-mono uppercase tracking-[0.12em] text-[--color-warn]">
+        subgraph error
+      </div>
       <p className="mt-2 text-body text-[--color-ink]">
         Couldn&apos;t reach the ENS Sepolia subgraph.
       </p>
@@ -126,7 +166,7 @@ function ErrorBlock({ message }: { message: string }) {
         href={ensAppParentUrl}
         target="_blank"
         rel="noreferrer"
-        className="mt-4 inline-block text-mono-s text-[--color-signal] underline decoration-transparent underline-offset-4 hover:decoration-[--color-signal]"
+        className="mt-4 inline-block text-mono-s text-[--color-link] underline decoration-transparent underline-offset-4 hover:decoration-[--color-link]"
       >
         Browse on the ENS app ↗
       </a>
@@ -136,10 +176,13 @@ function ErrorBlock({ message }: { message: string }) {
 
 function EmptyBlock() {
   return (
-    <div className="border border-dashed border-[--color-rule] bg-[--color-surface-raised] px-6 py-12 text-center">
-      <div className="text-eyebrow font-mono text-[--color-ink-mute]">no scans match</div>
-      <p className="mt-3 text-body text-[--color-ink-mute]">
-        Adjust the filters above, or be the first to mint a scan and watch it land here.
+    <div className="rounded-[20px] border border-dashed border-[--color-rule] bg-[--color-surface-raised] px-6 py-12 text-center">
+      <div className="text-eyebrow font-mono uppercase tracking-[0.12em] text-[--color-accent]">
+        no scans match
+      </div>
+      <p className="mt-3 text-body text-[--color-ink]">
+        Adjust the filters above, or be the first to mint a scan and watch it
+        land here.
       </p>
     </div>
   );
