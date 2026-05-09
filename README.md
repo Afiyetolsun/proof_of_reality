@@ -37,23 +37,38 @@ scans to cryptographic proof so they can't be forged by AI.
 
 ## What it does
 
+Three capture modes, all signed the same way:
+
+| Mode | UX | Output | Use it for |
+|---|---|---|---|
+| 📷 **Photo** | One click | `<id>.ply` (depth → coloured points, current view) | Quick attested 3D snapshot |
+| 🎥 **Video** | Start → record → Stop | `<id>.npz` (RGB + depth stack + intrinsics + ts) | Replayable / re-projectable scan |
+| 🌐 **Cloud** | Start → record → Stop | `<id>.ply` (TSDF SLAM merge) | Whole-room reconstruction |
+
+For all three:
+
 1. **Capture.** OAK4 stereo cameras + colour camera produce synchronised
-   RGB + depth frames (640×400 @ 10 fps) on-device.
-2. **SLAM.** Open3D's RGB-D odometry + `ScalableTSDFVolume` integrates frames
-   into a single world-frame point cloud. Pure CPU, no IMU needed.
-3. **Save.** At Stop the TSDF is meshed into a colored PLY.
-4. **Hash + sign.** SHA-256 of the PLY is sent to the USB Armory's GoTEE
-   bridge. The Trusted Applet (`gotee-applet/sign_hash.rs`) HMAC-SHA256s
-   it with a hardware-derived key whose private half never leaves Secure
-   World.
-5. **Envelope.** A JSON sidecar lands next to the PLY:
+   RGB + depth frames (640×400 @ 10 fps) on-device. A `dai.node.Sync`
+   pairs each colour ImgFrame with its colour-aligned depth frame.
+2. **Process.** Photo back-projects one frame; Video buffers the frame
+   stream; Cloud runs Open3D RGB-D odometry + `ScalableTSDFVolume`
+   integration (CPU-only, no IMU).
+3. **Save.** A binary PLY (Photo / Cloud) or a compressed NPZ (Video).
+4. **Hash + sign.** SHA-256 of the artifact is sent to the USB Armory's
+   GoTEE bridge. The Trusted Applet (`gotee-applet/sign_hash.rs`)
+   HMAC-SHA256s it with a hardware-derived key whose private half never
+   leaves Secure World.
+5. **Envelope.** A JSON sidecar lands next to the artifact:
 
    ```json
    {
      "scan_id": "832eb454e7c8",
+     "mode": "cloud",
+     "artifact": "832eb454e7c8.ply",
+     "artifact_sha256": "9f7bb9a13d91…",
      "ply_sha256": "9f7bb9a13d91…",
-     "frames_integrated": 20,
      "point_count": 22841,
+     "integrated": 20,
      "duration_s": 6.193,
      "gotee": {
        "device_id": "558075540a46e624",
@@ -66,6 +81,19 @@ scans to cryptographic proof so they can't be forged by AI.
    `mac = HMAC-SHA256(derived_key, sha256_bytes || nonce)`. Anyone with
    the same Armory can recompute the MAC and verify the scan was produced
    by *this* hardware after the nonce was generated.
+
+### REST API
+
+| Endpoint | What |
+|---|---|
+| `POST /capture/photo` | Snapshot the current frame. Returns the envelope synchronously. |
+| `POST /record/start/{video\|cloud}` | Begin a recording session. |
+| `POST /record/stop` | Finalise the active recording. Returns the envelope. |
+| `GET /record/state` | Current mode + scan_id + elapsed + frame count. |
+| `GET /scans` | All envelopes, newest first. |
+| `GET /scans/{filename}` | Download a `.ply` / `.npz` / `.json`. |
+| `GET /debug/network` | In-container connectivity dump (nc to bridge etc). |
+| `GET /config` | UI config bag (viz port, mode caps). |
 
 ---
 
