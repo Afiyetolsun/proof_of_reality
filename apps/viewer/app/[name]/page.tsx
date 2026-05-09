@@ -18,8 +18,8 @@
  */
 import Link from "next/link";
 import Script from "next/script";
-import { notFound } from "next/navigation";
 import { resolveEnsName, contentUrl, directContentUrl, normalizeName } from "@/lib/ens";
+import { LandingSearch } from "../LandingSearch";
 import { getProof } from "@/lib/chain";
 import { runVerification } from "@/lib/verify";
 import { ShareButton } from "./ShareButton";
@@ -37,10 +37,9 @@ export default async function NamePage({ params }: PageProps) {
 
   const res = await resolveEnsName(name);
   if (!res.ok) {
-    if (res.error.code === "NOT_FOUND") notFound();
     return (
       <ErrorView
-        title="Couldn't resolve this name"
+        kind={res.error.code}
         message={res.error.message}
         name={name}
       />
@@ -191,20 +190,67 @@ export default async function NamePage({ params }: PageProps) {
 }
 
 function ErrorView({
-  title,
+  kind,
   message,
   name,
 }: {
-  title: string;
+  kind: "NOT_FOUND" | "NOT_OUR_RESOLVER" | "RPC_ERROR";
   message: string;
   name: string;
 }) {
+  // Friendly per-kind copy. Avoid surfacing the raw error to most
+  // users — those are useful for debugging but not for someone who
+  // just typed a wrong name.
+  const copy = {
+    NOT_FOUND: {
+      icon: "🔍",
+      title: "No proof at this name",
+      tagline: (
+        <>
+          Nothing minted under{" "}
+          <span className="mono" style={{ color: "var(--text)" }}>
+            {name}
+          </span>{" "}
+          yet — check the spelling or paste a different handle.
+        </>
+      ),
+      hint: "Names look like vin-<12hex>.realityproof.eth or your-chosen-name.realityproof.eth",
+    },
+    NOT_OUR_RESOLVER: {
+      icon: "🔗",
+      title: "Wrong resolver",
+      tagline: (
+        <>
+          <span className="mono" style={{ color: "var(--text)" }}>{name}</span>{" "}
+          exists in ENS but isn&apos;t pointed at our resolver — so it&apos;s not a Reality NFT.
+        </>
+      ),
+      hint: "Reality NFT names use a custom resolver on Eth Sepolia.",
+    },
+    RPC_ERROR: {
+      icon: "⚡",
+      title: "RPC blip",
+      tagline: <>Couldn&apos;t reach the Ethereum Sepolia node — try again in a moment.</>,
+      hint: message,
+    },
+  }[kind];
+
   return (
     <main className="page">
       <header className="hero">
-        <h1>{title}</h1>
-        <p className="hero-tag mono">{name}</p>
-        <p className="muted">{message}</p>
+        <div style={{ fontSize: 56, marginBottom: 12 }}>{copy.icon}</div>
+        <h1 style={{ fontFamily: "inherit", fontSize: "clamp(22px, 4vw, 28px)" }}>
+          {copy.title}
+        </h1>
+        <p className="hero-tag" style={{ marginTop: 12 }}>
+          {copy.tagline}
+        </p>
+        <p className="muted" style={{ fontSize: 13, marginTop: 4 }}>
+          {copy.hint}
+        </p>
+        <div style={{ marginTop: 24 }}>
+          <LandingSearch />
+        </div>
       </header>
       <footer className="footer">
         <Link href="/">← Proof of Reality</Link>
