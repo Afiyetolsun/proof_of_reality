@@ -11,6 +11,12 @@ venv/
 .idea/
 .vscode/
 
+# Local secrets — sourced by scripts/deploy-app.sh, never committed.
+# Holds CAMERA_SHARED_SECRET, SWARM_BEE_URL, SWARM_POSTAGE_BATCH_ID, etc.
+.env
+.env.local
+.envrc
+
 # App-generated
 scans/*.ply
 scans/*.json

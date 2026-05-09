@@ -23,9 +23,15 @@
 #
 # Direct-storage env (omit to leave the OAK in api-only mode, in which
 # scenes >4MB silently downgrade to local:<sha> and aren't pinned):
-#   BEE_URL                   Bee node URL, e.g. http://89.116.31.10:1633
-#   SWARM_POSTAGE_BATCH_ID    Bee postage batch ID
-#   PINATA_JWT                alternative IPFS path; takes precedence over Bee
+#   SWARM_BEE_URL (or BEE_URL)  Bee node URL, e.g. http://89.116.31.10:1633.
+#                               SWARM_BEE_URL is the backend-canonical name;
+#                               BEE_URL is accepted as an alias.
+#   SWARM_POSTAGE_BATCH_ID      Bee postage batch ID
+#   PINATA_JWT                  alternative IPFS path; takes precedence over Bee
+#
+# Tip: keep these in a gitignored `.env` at the repo root and source
+# it before running this script (`set -a; source .env; set +a`) so you
+# don't have to re-type long secrets each shell session.
 #
 # Optional env:
 #   OAK_DEVICE                oakctl -d argument (default 1 → first listed device)
@@ -106,6 +112,11 @@ echo "[4/5] push runtime env (snapshot + overrides)"
 cat "$PREV_ENV_FILE" > "$NEW_ENV_FILE"
 echo "BACKEND_URL=$BACKEND_URL" >> "$NEW_ENV_FILE"
 [ -n "${CAMERA_SHARED_SECRET:-}" ]   && echo "CAMERA_SHARED_SECRET=$CAMERA_SHARED_SECRET"   >> "$NEW_ENV_FILE"
+# SWARM_BEE_URL is the backend-canonical name (matches env.ts). BEE_URL
+# is accepted as an alias for back-compat with earlier deploys; main.py
+# reads SWARM_BEE_URL as a fallback when BEE_URL isn't set, so pushing
+# either name reaches the OAK app.
+[ -n "${SWARM_BEE_URL:-}" ]          && echo "SWARM_BEE_URL=$SWARM_BEE_URL"                >> "$NEW_ENV_FILE"
 [ -n "${BEE_URL:-}" ]                && echo "BEE_URL=$BEE_URL"                            >> "$NEW_ENV_FILE"
 [ -n "${SWARM_POSTAGE_BATCH_ID:-}" ] && echo "SWARM_POSTAGE_BATCH_ID=$SWARM_POSTAGE_BATCH_ID" >> "$NEW_ENV_FILE"
 [ -n "${PINATA_JWT:-}" ]             && echo "PINATA_JWT=$PINATA_JWT"                      >> "$NEW_ENV_FILE"
