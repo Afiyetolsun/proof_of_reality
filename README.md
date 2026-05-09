@@ -163,6 +163,7 @@ the recorder dials the host LAN IP.
 │   ├── README.md       build + flash instructions
 │   └── sign_hash.rs    HMAC-SHA256 with hardware-derived key
 └── scripts/
+    ├── deploy-app.sh       push a new oakapp build to the device (autostart, env)
     ├── deploy.sh           scp scripts to OAK and run setup (--systemd opt)
     ├── forwarder.py        TCP relay (runs on the OAK host)
     ├── oak-host-setup.sh   one-shot: bring up usb0, start forwarder
@@ -233,16 +234,73 @@ ssh root@<oak-ip> 'systemctl restart oak-gotee'
 
 ### 3. Deploy the oakapp
 
+**Quick & ephemeral (develop mode):**
+
 ```bash
-oakctl connect 192.168.88.236
+oakctl device connection set 1
 oakctl app run .
 ```
+
+Runs from source, no autostart, env not persisted. Good for iterating.
+
+**Production push (recommended):**
+
+```bash
+OAK_PASSWORD=<root-pwd> \
+CAMERA_SHARED_SECRET=<32-byte-hex> \
+./scripts/deploy-app.sh
+```
+
+`scripts/deploy-app.sh` is idempotent and handles every step:
+
+1. Uninstalls any previous version of `com.example.apps.scan-and-sign`.
+2. Builds the `.oakapp` package from this repo.
+3. Installs it on the device.
+4. Pushes runtime env (`BACKEND_URL`, `CAMERA_SHARED_SECRET`).
+5. Starts with `--enable --disable-others` so the app **auto-starts on
+   boot** — survives reboots, USB disconnects, and OS updates.
+
+Re-run any time you change the code; the script tears down the previous
+install before pushing the new one. Env defaults: `BACKEND_URL` →
+`https://proof-of-reality-api.vercel.app`. Override via env var to point
+at staging.
+
+#### Runtime config (set via `oakctl app config set`)
+
+| Var | Purpose |
+|---|---|
+| `BACKEND_URL` | proof-of-reality backend; empty = local-only Space Mode |
+| `CAMERA_SHARED_SECRET` | `X-Camera-Key` for the backend (separate from iOS's `IOS_SHARED_SECRET`) |
+| `IOS_SHARED_SECRET` | legacy fallback if `CAMERA_SHARED_SECRET` is unset |
+| `MODE` | unused — capture mode is per-request now (photo / video / cloud) |
+| `GOTEE_HOST` / `GOTEE_PORT` | default `<oak-ip>:4000` (set by entrypoint) |
+| `DEVICE_BUNDLE_ID` | bundle identifier in the canonical proof bundle |
 
 Open **http://&lt;oak-ip&gt;:8080** and hit Start.
 
 <p align="center">
   <img src="assets/deploy.gif" alt="oakctl deploy + first scan" width="720">
 </p>
+
+### Proof tiers
+
+The app picks the best tier it can achieve from what's currently available
+and tags every scan with the result:
+
+| Tier | Backend reachable | USB Armory plugged | Result |
+|---|---|---|---|
+| `cosmic+token` | yes (with satSig) | yes | sat-signed nonce + Armory MAC, mints now |
+| `cosmic` | yes (with satSig) | no | sat-signed nonce + `MOCK` attestation, mints now |
+| `online+token` | yes (cTRNG derived) | yes | TRNG nonce + Armory MAC, mints now |
+| `online` | yes (cTRNG derived) | no | TRNG nonce + `MOCK`, mints now |
+| `space+token` | no / Space Mode | yes | local urandom nonce + Armory MAC, **deferred mint** |
+| `space` | no | no | local nonce only, deferred / no proof anchoring |
+
+`space*` rows persist their `bundle.json` + Armory sig and expose a
+`POST /retry-mint/{scan_id}` endpoint (and a ↻ retry-mint button in the
+UI) so you can replay them through the backend whenever it's reachable
+again. The on-chain `bundleHash` is the same one the Armory already
+signed offline.
 
 ### 4. Local development (peripheral mode)
 
