@@ -117,23 +117,27 @@ function GlbCard({
   const isRoom = mode === "roomPlan" || mode === "room";
   const ref = useRef<HTMLElement | null>(null);
 
-  // Two surgeries on the GLB at load time:
+  // Two material tweaks applied on GLB load to make RoomPlan scans
+  // render correctly:
   //
-  // 1. Force every material double-sided. RoomPlan exports walls as
-  //    single-sided planes facing inward, so when model-viewer's
-  //    auto-framing drops the camera outside the bounding box, every
-  //    wall is backface-culled and only the floor survives.
+  // 1. Double-sided rendering. RoomPlan exports walls as single-sided
+  //    planes facing inward; without this, the auto-framed camera
+  //    sitting outside the bounding box sees only backfaces and the
+  //    room collapses to a floor plane.
   //
-  // 2. Tint each material a slightly different shade. The unsolvable
-  //    problem with white-on-white room scans is that adjacent walls
-  //    reflect the IBL identically — same brightness on both sides of
-  //    a corner means the corner seam is literally not in the rendered
-  //    image. Real architectural viz fixes this with baked AO; we
-  //    don't have AO, but if floor/wall/ceiling each get a distinct
-  //    calm hue, the seams pop on their own. Tints are low-saturation
-  //    so it still reads as "white room" rather than a rainbow.
-  //    Heuristic: name-match floor/ceiling/wall first, then fall back
-  //    to assigning by index from a calm palette.
+  // 2. Polygon offset. RoomPlan's USD also emits overlapping coplanar
+  //    geometry (e.g. wall+ceiling sharing the exact same edge plane,
+  //    inner+outer wall faces at near-identical depth), and Blender's
+  //    USD→GLB doesn't dedupe it. Two surfaces fighting for the same
+  //    pixel produces the white-flickering "stuck" texels along corners
+  //    you've been seeing — that's z-fighting. polygonOffset nudges
+  //    depth values by a slope-proportional amount, breaking the tie
+  //    cleanly. We reach into model-viewer's underlying three.js
+  //    Material via its internal symbol; best effort, fails silently
+  //    if the API moves between versions.
+  //
+  // Both are safe no-ops for object captures (closed-hull meshes with
+  // no coplanar duplicates), so we apply them unconditionally.
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
@@ -145,33 +149,19 @@ function GlbCard({
       try {
         const mats = mv.model?.materials ?? [];
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        for (const m of mats) m.setDoubleSided?.(true);
-
-        if (isRoom && mats.length > 0) {
-          type RGBA = [number, number, number, number];
-          const FLOOR: RGBA = [0.86, 0.80, 0.70, 1];     // warm beige
-          const CEILING: RGBA = [0.72, 0.74, 0.76, 1];   // light slate
-          const WALLS: RGBA[] = [
-            [0.94, 0.94, 0.96, 1],                       // cool white
-            [0.78, 0.80, 0.84, 1],                       // pale blue-grey
-            [0.88, 0.86, 0.82, 1],                       // soft cream
-          ];
-          const FALLBACK: RGBA[] = [...WALLS, FLOOR, CEILING, [0.90, 0.86, 0.78, 1]];
-          const pick = (arr: RGBA[], i: number): RGBA => arr[i % arr.length] ?? arr[0]!;
+        for (const m of mats) {
+          m.setDoubleSided?.(true);
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          mats.forEach((m: any, i: number) => {
-            const name = (m.name ?? "").toLowerCase();
-            let color: RGBA;
-            if (/floor|ground/.test(name)) color = FLOOR;
-            else if (/ceil/.test(name)) color = CEILING;
-            else if (/wall/.test(name)) color = pick(WALLS, i);
-            else color = pick(FALLBACK, i);
-            try {
-              m.pbrMetallicRoughness?.setBaseColorFactor?.(color);
-            } catch {
-              /* material API might be locked, skip */
-            }
-          });
+          const tm: any =
+            m[Symbol.for("material")] ??
+            m.threeMaterial ??
+            m._material;
+          if (tm) {
+            tm.polygonOffset = true;
+            tm.polygonOffsetFactor = 1;
+            tm.polygonOffsetUnits = 1;
+            tm.needsUpdate = true;
+          }
         }
       } catch (e) {
         console.warn("[scene] post-load material tweak failed", e);
@@ -182,7 +172,7 @@ function GlbCard({
       cancelled = true;
       el.removeEventListener("load", onLoad);
     };
-  }, [url, isRoom]);
+  }, [url]);
 
   return (
     <div className="overflow-hidden rounded-[20px] border border-[--color-rule] bg-[--color-surface-raised] p-2">
@@ -202,13 +192,9 @@ function GlbCard({
           // single flat shade and you can't see geometry edges.
           "environment-image": "neutral",
           "tone-mapping": "aces",
-          // Lower exposure for rooms so shadows + AO read against
-          // white walls instead of getting washed out by IBL.
-          exposure: isRoom ? "0.7" : "1.0",
+          exposure: "1.0",
           "shadow-intensity": "1",
-          // Sharp shadow on rooms gives corner contrast that defines
-          // adjacent walls; softer shadow on objects looks more natural.
-          "shadow-softness": isRoom ? "0.25" : "0.6",
+          "shadow-softness": isRoom ? "0.5" : "0.6",
           // Lift the camera slightly for room scans so we look down
           // into the floor plan.
           ...(isRoom ? { "camera-orbit": "25deg 65deg auto" } : {}),
@@ -276,13 +262,14 @@ function UsdzCard({ url, attestor }: { url: string; attestor?: string }) {
 function Caption({ attestor }: { attestor?: string }) {
   if (!attestor) return null;
   return (
-    <p className="px-2 pt-2 text-mono-s text-[--color-ink]">
-      <span className="text-[--color-signal]">Captured by</span>{" "}
+    <p className="px-2 pt-2 text-mono-s">
+      <span style={{ color: "var(--color-accent)" }}>Captured by</span>{" "}
       <a
         href={`https://sepolia.basescan.org/address/${attestor}`}
         target="_blank"
         rel="noreferrer"
-        className="font-mono text-[--color-ink] underline decoration-[--color-signal-soft] underline-offset-4 hover:decoration-[--color-signal]"
+        className="font-mono underline decoration-current/40 underline-offset-4 hover:decoration-current"
+        style={{ color: "var(--color-link)" }}
       >
         {attestor.slice(0, 8)}…{attestor.slice(-6)}
       </a>

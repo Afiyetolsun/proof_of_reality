@@ -13,6 +13,19 @@
   --color-signal-soft: oklch(0.74 0.14 58 / 0.18);
   --color-warn: oklch(0.62 0.16 28);
 
+  /* Bright mint accent — matches apps/viewer's #6ee7b7. Used on the
+     per-proof page for primary CTAs (share button) and labels. Picked
+     to be vivid against the surface-deep background so the page stops
+     reading as monochrome. */
+  --color-accent: oklch(0.86 0.16 165);
+  --color-accent-fg: oklch(0.20 0.04 165);
+  --color-accent-soft: oklch(0.86 0.16 165 / 0.14);
+
+  /* Sky blue for outbound hyperlinks (Basescan, Storage, ENS app, the
+     attestor address). Distinct from the mint accent so links read as
+     "external action" instead of "this page's primary tone". */
+  --color-link: oklch(0.80 0.13 245);
+
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", Menlo, monospace;
 

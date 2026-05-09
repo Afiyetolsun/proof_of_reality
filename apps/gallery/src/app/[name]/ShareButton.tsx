@@ -32,9 +32,14 @@ export function ShareButton({ name }: Props) {
     <button
       onClick={copy}
       type="button"
-      className="inline-flex items-center gap-2 rounded-full bg-[--color-signal] px-5 py-2.5 text-mono-s font-semibold text-[--color-surface-deep] transition-transform hover:translate-y-[-1px] active:translate-y-0"
+      className="inline-flex items-center gap-2 rounded-full px-6 py-3 text-mono-s font-semibold transition-transform hover:translate-y-[-1px] active:translate-y-0"
+      style={{
+        background: "var(--color-accent)",
+        color: "var(--color-accent-fg)",
+        boxShadow: "0 8px 28px var(--color-accent-soft)",
+      }}
     >
-      {state === "copied" ? "✓ copied" : "share this proof"}
+      {state === "copied" ? "✓ copied" : "Share this proof"}
     </button>
   );
 }

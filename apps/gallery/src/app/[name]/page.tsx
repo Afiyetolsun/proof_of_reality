@@ -97,7 +97,7 @@ export default async function NamePage({ params }: PageProps) {
       )}
 
       <section className="rounded-[20px] border border-[--color-rule] bg-[--color-surface-raised] px-6 py-5">
-        <h2 className="m-0 mb-3.5 text-eyebrow font-mono uppercase tracking-[0.08em] text-[--color-signal]">
+        <h2 className="m-0 mb-3.5 text-eyebrow font-mono uppercase tracking-[0.12em] text-[--color-accent]">
           Verification
         </h2>
         {checks.length === 0 && record.tokenId === null && (
@@ -121,7 +121,7 @@ export default async function NamePage({ params }: PageProps) {
       </section>
 
       <section className="rounded-[20px] border border-[--color-rule] bg-[--color-surface-raised] px-6 py-5">
-        <h2 className="m-0 mb-3.5 text-eyebrow font-mono uppercase tracking-[0.08em] text-[--color-signal]">
+        <h2 className="m-0 mb-3.5 text-eyebrow font-mono uppercase tracking-[0.12em] text-[--color-accent]">
           Proof bundle
         </h2>
         <dl className="grid grid-cols-[minmax(120px,auto)_1fr] gap-x-5 gap-y-3 text-body-s">
@@ -137,7 +137,7 @@ export default async function NamePage({ params }: PageProps) {
                     href={record.url}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-mono-s text-[--color-signal] underline decoration-transparent underline-offset-4 hover:decoration-[--color-signal]"
+                    className="text-mono-s text-[--color-link] underline decoration-transparent underline-offset-4 hover:decoration-[--color-link]"
                   >
                     Basescan ↗
                   </a>
@@ -195,7 +195,7 @@ export default async function NamePage({ params }: PageProps) {
                 href={directContentUrl(record.content)}
                 target="_blank"
                 rel="noreferrer"
-                className="font-mono text-mono-s text-[--color-ink] underline decoration-transparent underline-offset-4 hover:text-[--color-signal] hover:decoration-[--color-signal]"
+                className="font-mono text-mono-s text-[--color-link] underline decoration-transparent underline-offset-4 hover:decoration-[--color-link]"
               >
                 {record.content.protocol}://{record.content.ref.slice(0, 14)}… ↗
               </a>
@@ -204,10 +204,10 @@ export default async function NamePage({ params }: PageProps) {
         </dl>
       </section>
 
-      <footer className="mt-2 flex items-center justify-between border-t border-[--color-rule] pt-4 text-mono-s text-[--color-ink-mute]">
+      <footer className="mt-2 flex items-center justify-between border-t border-[--color-rule] pt-4 text-mono-s">
         <Link
           href="/"
-          className="transition-colors hover:text-[--color-ink]"
+          className="text-[--color-ink-mute] transition-colors hover:text-[--color-ink]"
         >
           ← Proof of Reality
         </Link>
@@ -215,7 +215,7 @@ export default async function NamePage({ params }: PageProps) {
           href={`${ensAppBase}/${record.name}`}
           target="_blank"
           rel="noreferrer"
-          className="transition-colors hover:text-[--color-ink]"
+          className="text-[--color-link] transition-colors hover:opacity-80"
         >
           View on ENS app ↗
         </a>
@@ -227,7 +227,7 @@ export default async function NamePage({ params }: PageProps) {
 function KV({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <>
-      <dt className="font-medium text-[--color-signal]">{label}</dt>
+      <dt className="font-medium text-[--color-accent]">{label}</dt>
       <dd className="m-0 min-w-0 break-words text-[--color-ink]">{children}</dd>
     </>
   );
