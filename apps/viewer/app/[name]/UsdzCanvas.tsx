@@ -85,16 +85,32 @@ export function UsdzCanvas({ url }: Props) {
 
     (async () => {
       try {
+        // Sanity-check that cross-origin isolation actually engaged.
+        // Without it, SharedArrayBuffer is undefined and the WASM
+        // module silently refuses to initialize.
+        const isolated = (globalThis as { crossOriginIsolated?: boolean }).crossOriginIsolated;
+        const sab = typeof SharedArrayBuffer !== "undefined";
+        console.log("[usdz] crossOriginIsolated =", isolated, "SAB =", sab);
+        if (!isolated || !sab) {
+          throw new Error(
+            "cross-origin isolation didn't engage — page is missing COOP/COEP headers (SAB unavailable)",
+          );
+        }
+
+        console.log("[usdz] fetching scene…");
         const res = await fetch(url);
         if (!res.ok) throw new Error(`fetch ${res.status}`);
         const blob = await res.blob();
+        console.log("[usdz] fetched", blob.size, "bytes; calling loader.loadFile…");
         if (disposed) return;
         const file = new File([blob], "scene.usdz", { type: "model/vnd.usdz+zip" });
         await loader.loadFile(file, groupHolder);
+        console.log("[usdz] loadFile resolved; framing camera");
         if (disposed) return;
         frameCamera(groupHolder, camera, controls);
         setStatus("ready");
       } catch (e) {
+        console.error("[usdz] load failed:", e);
         if (disposed) return;
         setErrorMsg((e as Error).message);
         setStatus("error");
