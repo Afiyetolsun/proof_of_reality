@@ -57,6 +57,24 @@
 		<true/>
 		<key>NSAllowsArbitraryLoadsInWebContent</key>
 		<true/>
+		<!-- Explicit per-host exception. iOS 26 increasingly ignores
+		     NSAllowsArbitraryLoads for direct IP-literal URLs unless
+		     paired with an exception entry. Update this IP whenever
+		     swarmBeeURL in Secrets.swift changes. -->
+		<key>NSExceptionDomains</key>
+		<dict>
+			<key>89.116.31.10</key>
+			<dict>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+				<key>NSIncludesSubdomains</key>
+				<false/>
+				<key>NSTemporaryExceptionMinimumTLSVersion</key>
+				<string>TLSv1.0</string>
+				<key>NSTemporaryExceptionRequiresForwardSecrecy</key>
+				<false/>
+			</dict>
+		</dict>
 	</dict>
 
 	<!-- ===== Scene + launch ===== -->
