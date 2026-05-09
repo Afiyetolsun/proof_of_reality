@@ -2,6 +2,10 @@ import { z } from "zod";
 
 const EnvSchema = z.object({
   IOS_SHARED_SECRET: z.string().min(16),
+  // Separate secret for 3rd-party cameras (OAK + USB Armory etc.). Optional —
+  // when unset the auth middleware only accepts the iOS secret, preserving
+  // existing behaviour. Issue + rotate independently of IOS_SHARED_SECRET.
+  CAMERA_SHARED_SECRET: z.string().min(16).optional(),
 
   ORBITPORT_CLIENT_ID: z.string().min(1),
   ORBITPORT_CLIENT_SECRET: z.string().min(1),
