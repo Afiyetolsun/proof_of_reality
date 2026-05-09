@@ -3,8 +3,24 @@ import { architectureUrl, githubUrl, viewerHome } from "../lib/viewer-link";
 export function Header() {
   return (
     <header className="container-page flex items-center justify-between py-6">
-      <a href="/" className="text-mono text-[--color-signal]" aria-label="Proof of Reality home">
-        proof of reality.
+      <a
+        href="/"
+        aria-label="Proof of Reality home"
+        className="group inline-flex items-baseline font-mono text-[--color-ink] transition-colors hover:text-[--color-signal]"
+        style={{
+          fontSize: "clamp(1.25rem, 1.6vw, 1.625rem)",
+          lineHeight: 1,
+          letterSpacing: "-0.025em",
+          fontWeight: 500,
+        }}
+      >
+        <span>proof of reality</span>
+        <span
+          aria-hidden
+          className="ml-[0.05em] text-[--color-signal] transition-transform duration-200 group-hover:translate-y-[-0.05em]"
+        >
+          .
+        </span>
       </a>
       <nav aria-label="Primary" className="flex items-center gap-6 text-mono-s">
         <a

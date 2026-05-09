@@ -14,8 +14,21 @@ export function Footer() {
     <footer className="container-page rule-top border-[--color-rule] py-14">
       <div className="grid grid-cols-2 gap-y-10 md:grid-cols-12">
         <div className="col-span-2 md:col-span-4">
-          <div className="text-mono text-[--color-signal]">proof of reality</div>
-          <p className="mt-3 max-w-xs text-body-s text-[--color-ink-mute]">
+          <div
+            className="inline-flex items-baseline font-mono text-[--color-ink]"
+            style={{
+              fontSize: "clamp(1.25rem, 1.6vw, 1.625rem)",
+              lineHeight: 1,
+              letterSpacing: "-0.025em",
+              fontWeight: 500,
+            }}
+          >
+            <span>proof of reality</span>
+            <span aria-hidden className="ml-[0.05em] text-[--color-signal]">
+              .
+            </span>
+          </div>
+          <p className="mt-4 max-w-xs text-body-s text-[--color-ink-mute]">
             Web3 oracle for the physical world. ETHPrague 2026, SpaceComputer track.
           </p>
         </div>

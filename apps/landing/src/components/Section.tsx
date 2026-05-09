@@ -23,10 +23,18 @@ export function Section({
   return (
     <section
       id={id}
-      className={`relative ${bleed ? "" : "container-page"} py-20 md:py-28 ${
-        rule ? "rule-top border-[--color-rule]" : ""
-      }`}
+      className={`relative ${bleed ? "" : "container-page"} py-24 md:py-32`}
     >
+      {rule && (
+        <div
+          aria-hidden
+          className={`pointer-events-none absolute inset-x-0 top-0 h-px ${
+            bleed ? "" : "container-page"
+          }`}
+        >
+          <div className="h-full w-full bg-gradient-to-r from-transparent via-[--color-rule] to-transparent opacity-60" />
+        </div>
+      )}
       {(eyebrow || index || display || intro) && (
         <header className={`${bleed ? "container-page" : ""} grid grid-cols-12 gap-x-6 gap-y-8`}>
           <div className="col-span-12 flex items-baseline justify-between md:col-span-4">
@@ -46,7 +54,7 @@ export function Section({
         </header>
       )}
       {children && (
-        <div className={`${bleed ? "" : ""} ${eyebrow || display ? "mt-14 md:mt-20" : ""}`}>
+        <div className={`${bleed ? "" : ""} ${eyebrow || display ? "mt-16 md:mt-24" : ""}`}>
           {children}
         </div>
       )}

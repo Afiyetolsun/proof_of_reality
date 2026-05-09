@@ -3,7 +3,6 @@ import { NonceTicker } from "../components/NonceTicker";
 import { SplatHero } from "../components/SplatHero";
 import { Section } from "../components/Section";
 import { CTAButton } from "../components/CTAButton";
-import { Mono } from "../components/Mono";
 import { RealVsFake } from "../components/RealVsFake";
 import { WitnessDiagram } from "../components/WitnessDiagram";
 import { FlowDiagram } from "../components/FlowDiagram";
@@ -42,9 +41,9 @@ function Hero() {
           for the <span className="text-[--color-signal]">physical world.</span>
         </h1>
         <p className="mt-8 max-w-[34rem] text-body text-[--color-ink-mute]">
-          A 30-second scan, anchored to a satellite-borne random number, signed by a key that
-          never leaves hardware, written to Base Sepolia. Five independent witnesses on every
-          proof. Not generatable by AI, not pre-recordable, not forgeable on the ground.
+          A 30-second scan, anchored to a satellite-signed nonce and signed by a key that never
+          leaves hardware. Five witnesses on every proof. Not generatable by AI, not
+          pre-recordable, not forgeable on the ground.
         </p>
         <div className="mt-10 flex flex-wrap items-center gap-x-8 gap-y-4">
           <CTAButton href={viewerHome} size="lg" external>
@@ -58,7 +57,7 @@ function Hero() {
         <dl className="mt-14 grid grid-cols-3 gap-6 border-t border-[--color-rule] pt-6">
           <Stat label="Witnesses" value="5" />
           <Stat label="Trust roots" value="public" />
-          <Stat label="Backend can forge" value="zero" />
+          <Stat label="Forgeable backend" value="no" />
         </dl>
       </div>
 
@@ -90,10 +89,10 @@ function TrustGap() {
         <>
           AI made every photograph editable.
           <br />
-          We made one inedible.
+          We made one it can&rsquo;t.
         </>
       }
-      intro="Marketplace listings drift toward fakes. RWA tokens claim assets that may not exist. Insurance disputes hinge on photographs that any laptop can generate in under a second. The web does not have a primitive for here, now, real."
+      intro="Marketplace listings drift toward fakes. RWA tokens claim assets that may not exist. Insurance disputes hinge on photographs that any laptop can generate in under a second. The web has no primitive for here, now, real."
     >
       <figure className="my-12 max-w-3xl">
         <blockquote className="font-serif italic text-[--color-ink]" style={{ fontSize: "clamp(1.5rem, 2.5vw, 2.25rem)", lineHeight: 1.3 }}>
@@ -111,8 +110,14 @@ function TrustGap() {
 
 function Witnesses() {
   return (
-    <section className="rule-top border-[--color-rule] py-20 md:py-28">
-      <div className="container-page mb-12">
+    <section className="relative py-24 md:py-32">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 h-px container-page"
+      >
+        <div className="h-full w-full bg-gradient-to-r from-transparent via-[--color-rule] to-transparent opacity-60" />
+      </div>
+      <div className="container-page mb-16">
         <div className="grid grid-cols-12 gap-x-6">
           <div className="col-span-12 md:col-span-4">
             <div className="text-mono-s text-[--color-ink-mute]">02</div>
@@ -120,14 +125,13 @@ function Witnesses() {
           </div>
           <div className="col-span-12 md:col-span-8">
             <h2 className="text-display-l text-[--color-ink]">
-              Five independent witnesses
+              Five witnesses
               <br />
               on every scan.
             </h2>
             <p className="mt-6 max-read text-body text-[--color-ink-mute]">
-              No single party guarantees a proof. Five do, drawn from physics, hardware, and on-chain registries.
-              Each one defends against a distinct class of attack. To forge a scan, you would have to break all
-              five at once.
+              No single party guarantees a proof. Five do, drawn from physics, hardware, and on-chain
+              registries.
             </p>
           </div>
         </div>
@@ -153,119 +157,158 @@ function Flow() {
       intro="An iPhone scanning a watch in a New York apartment and an OAK 4 D camera scanning a vehicle in a Prague garage produce the same proof shape, hit the same backend, and mint to the same contract."
     >
       <FlowDiagram />
+      <HardwareSpotlight />
     </Section>
+  );
+}
+
+function HardwareSpotlight() {
+  const specs = [
+    ["IP67", "dust + jet-water rated"],
+    ["Aluminum body", "passively cooled, field-grade"],
+    ["Stereo depth + RGB + IMU", "metric capture, no markers"],
+    ["On-board NPU", "depth + tracking on-device"],
+  ] as const;
+
+  return (
+    <div className="mt-20 grid grid-cols-1 gap-x-6 gap-y-10 md:mt-24 md:grid-cols-12">
+      <div className="md:col-span-7">
+        {/* Animated WebP with per-frame alpha. Plain <img> rather than next/image
+            so the animation isn't transcoded to a static frame. */}
+        <img
+          src="/hardware/oak4d.webp"
+          alt="Luxonis OAK 4 D, four-lens stereo + RGB camera module, slowly rotating"
+          width={1100}
+          height={600}
+          loading="lazy"
+          decoding="async"
+          className="h-auto w-full select-none"
+        />
+      </div>
+
+      <div className="md:col-span-5 md:pl-2">
+        <div className="text-mono-s text-[--color-signal]">OAK 4 D · LUXONIS</div>
+        <h3 className="mt-4 text-h2 text-[--color-ink]">Industrial-grade capture.</h3>
+        <p className="mt-5 max-read text-body text-[--color-ink-mute]">
+          The body that feeds our B2B signing path. IP67-rated, machined aluminum, no
+          moving parts, four cameras and an IMU on a single USB-C tether or PoE+ run.
+        </p>
+
+        <dl className="mt-8 divide-y divide-[--color-rule]">
+          {specs.map(([k, v]) => (
+            <div
+              key={k}
+              className="flex items-baseline justify-between gap-4 py-3 text-body-s"
+            >
+              <dt className="text-[--color-ink]">{k}</dt>
+              <dd className="text-right text-mono-s text-[--color-ink-mute]">{v}</dd>
+            </div>
+          ))}
+        </dl>
+      </div>
+    </div>
   );
 }
 
 function Demo() {
+  const steps = [
+    ["Pick any mint", "the gallery lists every Reality NFT under realityproof.eth"],
+    ["Recompute the hash", "JCS-canonicalize the bundle, keccak it, match against on-chain"],
+    ["Check the five signatures", "satellite, KMS, device, Swarm CAC, App Attest"],
+    ["Accept or reject", "no third party in the loop"],
+  ] as const;
+
   return (
-    <Section id="demo" eyebrow="LIVE DEMO" index="04" display="See it work in 90 seconds.">
-      <div className="grid grid-cols-1 gap-10 md:grid-cols-12">
+    <Section id="demo" eyebrow="VERIFY ONE" index="04" display="Open a real proof.">
+      <div className="grid grid-cols-1 gap-12 md:grid-cols-12 md:gap-x-6">
         <div className="md:col-span-7">
-          <div className="aspect-video w-full border border-[--color-rule] bg-[--color-surface-raised]">
-            <DemoVideo />
-          </div>
+          <ol className="space-y-5">
+            {steps.map(([title, detail], i) => (
+              <li
+                key={title}
+                className="grid grid-cols-[auto_1fr] items-baseline gap-x-5 gap-y-1"
+              >
+                <span className="text-mono-s text-[--color-signal]">
+                  {String(i + 1).padStart(2, "0")}
+                </span>
+                <h3 className="text-h2 text-[--color-ink]" style={{ fontSize: "1.5rem" }}>
+                  {title}
+                </h3>
+                <span aria-hidden />
+                <p className="max-read text-body-s text-[--color-ink-mute]">{detail}</p>
+              </li>
+            ))}
+          </ol>
         </div>
-        <div className="md:col-span-5">
-          <h3 className="text-h2 text-[--color-ink]">A real bundle on Base Sepolia.</h3>
-          <p className="mt-4 max-read text-body-s text-[--color-ink-mute]">
-            Or skip the video and verify a real, minted ProofBundle yourself. The viewer recomputes the bundle
-            hash from Swarm, checks all five signatures, and either rejects or shows you a green page.
+
+        <aside className="md:col-span-5">
+          <p className="max-read text-body text-[--color-ink-mute]">
+            The app re-fetches the bundle from Swarm, recomputes the hash, and checks all five
+            witnesses against their public keys. It either accepts or it doesn&rsquo;t.
           </p>
-
-          <dl className="mt-8 space-y-4 border-t border-[--color-rule] pt-4">
-            <KV
-              k="bundleHash"
-              v="0xa7c4…b91f"
-              caption="JCS-canonicalized, keccak-256"
-            />
-            <KV
-              k="swarmRef"
-              v="bah5acg…q7zu"
-              caption="content-addressed via Bee BMT"
-            />
-            <KV
-              k="tx"
-              v="0x312f…8d04"
-              caption="RealityProof.mint(...) on base-sepolia"
-            />
-          </dl>
-
-          <div className="mt-8">
-            <CTAButton href={viewerHome} external>
+          <div className="mt-8 flex flex-wrap items-center gap-x-8 gap-y-4">
+            <CTAButton href={viewerHome} size="lg" external>
               Open the app
             </CTAButton>
+            <CTAButton href={ensAppParentUrl} variant="ghost" external>
+              Browse on ENS
+            </CTAButton>
           </div>
-        </div>
+        </aside>
       </div>
     </Section>
   );
 }
 
-function DemoVideo() {
-  return (
-    <div className="relative h-full w-full">
-      <video
-        className="h-full w-full"
-        controls
-        preload="metadata"
-        poster=""
-        playsInline
-        muted
-      >
-        <source src="/demo.mp4" type="video/mp4" />
-      </video>
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 flex items-center justify-center text-mono-s text-[--color-ink-mute]"
-      >
-        DEMO · MP4 PENDING
-      </div>
-    </div>
-  );
-}
-
-function KV({ k, v, caption }: { k: string; v: string; caption: string }) {
-  return (
-    <div className="border-b border-[--color-rule] pb-3">
-      <dt className="text-mono-s text-[--color-ink-mute]">{k}</dt>
-      <dd className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <Mono className="text-[--color-signal]">{v}</Mono>
-        <span className="text-mono-s text-[--color-ink-mute]">{caption}</span>
-      </dd>
-    </div>
-  );
-}
-
 function BuiltOn() {
-  const items = [
-    ["SpaceComputer", "Orbitport · Space Fabric"],
-    ["Swarm", "decentralized storage"],
-    ["Base", "L2 settlement"],
-    ["ENS", "subdomain resolution"],
-    ["Apple", "Secure Enclave · App Attest"],
-    ["Luxonis", "OAK 4 D camera"],
-    ["USB Armory", "Mk II ECDSA signer"],
-    ["TamaGo", "bare-metal Go firmware"],
+  const groups = [
+    {
+      eyebrow: "TRUST ROOTS",
+      items: [
+        ["SpaceComputer", "Orbitport cTRNG · Space Fabric KMS"],
+        ["Apple", "Secure Enclave · App Attest"],
+        ["USB Armory", "Mk II ECDSA in DCP + OTPMK"],
+      ],
+    },
+    {
+      eyebrow: "SETTLEMENT",
+      items: [
+        ["Base", "Sepolia L2"],
+        ["ENS", "realityproof.eth subnames"],
+      ],
+    },
+    {
+      eyebrow: "STORAGE & FIRMWARE",
+      items: [
+        ["Swarm", "Bee + BMT content addressing"],
+        ["Luxonis", "OAK 4 D camera"],
+        ["TamaGo", "bare-metal Go firmware"],
+      ],
+    },
   ] as const;
+
   return (
     <Section eyebrow="BUILT ON" index="05" display="No cobranding fictions.">
       <p className="max-read text-body text-[--color-ink-mute]">
-        Every dependency below is a real one. We hold no hidden trust roots; if a system in this list breaks, the
-        verifier says so.
+        Every dependency is a real one. If any of them breaks, the app says so.
       </p>
-      <ul className="mt-12 grid grid-cols-2 gap-px bg-[--color-rule] md:grid-cols-4">
-        {items.map(([name, sub]) => (
-          <li
-            key={name}
-            className="flex flex-col justify-between bg-[--color-surface-deep] p-6 transition-colors hover:bg-[--color-surface-raised]"
-            style={{ minHeight: 132 }}
-          >
-            <span className="text-mono-s text-[--color-ink-mute]">{sub.toUpperCase()}</span>
-            <span className="mt-6 text-h2 text-[--color-ink]">{name}</span>
-          </li>
+      <div className="mt-14 grid grid-cols-1 gap-x-6 gap-y-12 md:grid-cols-12">
+        {groups.map((g) => (
+          <section key={g.eyebrow} className="md:col-span-4">
+            <div className="text-eyebrow font-mono text-[--color-signal]">{g.eyebrow}</div>
+            <ul className="mt-5 divide-y divide-[--color-rule]">
+              {g.items.map(([name, sub]) => (
+                <li key={name} className="flex items-baseline justify-between gap-4 py-3">
+                  <span className="text-h2 text-[--color-ink]" style={{ fontSize: "1.375rem" }}>
+                    {name}
+                  </span>
+                  <span className="text-right text-mono-s text-[--color-ink-mute]">{sub}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
         ))}
-      </ul>
+      </div>
     </Section>
   );
 }
@@ -290,15 +333,20 @@ function BuildWithUs() {
   ];
   return (
     <Section eyebrow="BUILD WITH US" index="06" display="A primitive, not a product.">
-      <div className="grid grid-cols-1 gap-10 md:grid-cols-3">
+      <ul className="divide-y divide-[--color-rule]">
         {audiences.map((a) => (
-          <article key={a.eyebrow} className="border-t border-[--color-signal] pt-5">
-            <div className="text-mono-s text-[--color-signal]">{a.eyebrow}</div>
-            <h3 className="mt-4 text-h2 text-[--color-ink]">{a.title}</h3>
-            <p className="mt-4 max-read text-body-s text-[--color-ink-mute]">{a.copy}</p>
-          </article>
+          <li
+            key={a.eyebrow}
+            className="grid grid-cols-1 gap-x-6 gap-y-3 py-8 md:grid-cols-12"
+          >
+            <div className="md:col-span-3">
+              <span className="text-mono-s text-[--color-signal]">{a.eyebrow}</span>
+            </div>
+            <h3 className="text-h2 text-[--color-ink] md:col-span-5">{a.title}</h3>
+            <p className="max-read text-body-s text-[--color-ink-mute] md:col-span-4">{a.copy}</p>
+          </li>
         ))}
-      </div>
+      </ul>
 
       <div className="mt-20 grid grid-cols-1 gap-6 border-t border-[--color-rule] pt-10 md:grid-cols-12">
         <div className="md:col-span-4">
