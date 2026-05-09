@@ -32,9 +32,7 @@ function Hero() {
   return (
     <section className="container-page relative grid grid-cols-1 items-end gap-x-6 gap-y-16 pt-12 pb-28 md:grid-cols-12 md:pt-16 md:pb-32">
       <div className="md:col-span-6">
-        <div className="text-mono-s text-[--color-signal]">
-          ETHPRAGUE 2026 · SPACECOMPUTER TRACK
-        </div>
+        <div className="text-mono-s text-[--color-signal]">ETHPRAGUE 2026</div>
         <h1 className="mt-6 text-display-xl text-[--color-ink]">
           Web3 oracle
           <br />
@@ -54,10 +52,9 @@ function Hero() {
           </CTAButton>
         </div>
 
-        <dl className="mt-14 grid grid-cols-3 gap-6 border-t border-[--color-rule] pt-6">
+        <dl className="mt-14 grid grid-cols-2 gap-6 border-t border-[--color-rule] pt-6">
           <Stat label="Witnesses" value="5" />
           <Stat label="Trust roots" value="public" />
-          <Stat label="Forgeable backend" value="no" />
         </dl>
       </div>
 

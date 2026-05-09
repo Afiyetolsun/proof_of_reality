@@ -29,7 +29,7 @@ export function Footer() {
             </span>
           </div>
           <p className="mt-4 max-w-xs text-body-s text-[--color-ink-mute]">
-            Web3 oracle for the physical world. ETHPrague 2026, SpaceComputer track.
+            Web3 oracle for the physical world. ETHPrague 2026.
           </p>
         </div>
 
