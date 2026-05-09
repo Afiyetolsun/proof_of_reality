@@ -17,20 +17,22 @@ interface Props {
 export function Badges({ checks }: Props) {
   return (
     <ul className="badges">
-      {checks.map((c) => (
-        <li
-          key={c.name}
-          className={c.ok ? "badge badge-ok" : "badge badge-fail"}
-        >
-          <span className="badge-icon" aria-hidden>
-            {c.ok ? "✓" : "✕"}
-          </span>
-          <div>
-            <div className="badge-name">{c.name}</div>
-            <div className="badge-detail">{c.detail}</div>
-          </div>
-        </li>
-      ))}
+      {checks.map((c) => {
+        const kind = c.kind ?? (c.ok ? "ok" : "fail");
+        const icon =
+          kind === "ok" ? "✓" : kind === "info" ? "i" : kind === "warn" ? "!" : "✕";
+        return (
+          <li key={c.name} className={`badge badge-${kind}`}>
+            <span className="badge-icon" aria-hidden>
+              {icon}
+            </span>
+            <div>
+              <div className="badge-name">{c.name}</div>
+              <div className="badge-detail">{c.detail}</div>
+            </div>
+          </li>
+        );
+      })}
     </ul>
   );
 }

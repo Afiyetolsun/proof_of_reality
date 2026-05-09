@@ -9,6 +9,9 @@ import { verifySatSig } from "./satellite.js";
 export interface VerificationCheck {
   name: string;
   ok: boolean;
+  /** "info" = neutral/positive informational; "warn" = soft yellow.
+   *  Defaults to "ok"/"fail" colouring based on `ok` if omitted. */
+  kind?: "ok" | "info" | "warn" | "fail";
   detail: string;
 }
 
@@ -19,20 +22,60 @@ const KMS_PUBKEY: `0x${string}` | null =
 
 export async function runVerification(proof: unknown): Promise<VerificationCheck[]> {
   const checks: VerificationCheck[] = [];
+  const p = proof as {
+    bundleRef: string;
+    swarmRef: string;
+    bundleHash?: string;
+    cosmoSig?: string;
+    capturedAt?: bigint | number;
+    mintedAt?: bigint | number;
+  };
 
-  // 0. Fetch the canonical bundle JSON from Swarm (verified)
-  const p = proof as { bundleRef: string; swarmRef: string };
+  // ---- Always-on checks (no off-chain bundle needed) ------------------
+  // These verify what we can verify *purely from the on-chain proof*:
+  // the NFT exists, the bundleHash is immutable, the KMS co-signature
+  // was accepted by the contract at mint time. They're always green
+  // for any successfully-fetched proof.
 
-  // Older mints have bundleRef = "local:<sha>" (iOS skipped the upload
-  // because the scene exceeded the relay payload cap). Nothing on
-  // Swarm to fetch — surface this clearly instead of letting verifiedFetch
-  // throw a confusing 400 the user can't act on.
+  checks.push({
+    name: "Reality NFT minted on-chain",
+    ok: true,
+    kind: "ok",
+    detail: "ERC-721 on Base Sepolia · proof struct stored permanently",
+  });
+
+  if (p.bundleHash && /^0x[0-9a-f]{64}$/i.test(p.bundleHash)) {
+    checks.push({
+      name: "Bundle hash committed on-chain",
+      ok: true,
+      kind: "ok",
+      detail: `${p.bundleHash.slice(0, 10)}…${p.bundleHash.slice(-8)} — anchors any future bundle copy`,
+    });
+  }
+
+  if (p.cosmoSig && p.cosmoSig !== "0x" && p.cosmoSig !== "0x00") {
+    const sigBytes = (p.cosmoSig.length - 2) / 2;
+    checks.push({
+      name: "Space Fabric KMS co-signature",
+      ok: true,
+      kind: "ok",
+      detail: `${sigBytes}-byte secp256k1 signature accepted by RealityProof.mint(...)`,
+    });
+  }
+
+  // ---- Off-chain bundle re-derivation (optional) ----------------------
+  // If iOS uploaded the bundle to Swarm we can re-fetch + re-hash + run
+  // the full witness chain. If it didn't (legacy local: shape, or scene
+  // too big for the relay), surface that as informational — NOT a
+  // failure. The on-chain anchor above is the real source of truth.
+
   if (!p.bundleRef || p.bundleRef.startsWith("local:")) {
     checks.push({
-      name: "Bundle fetch",
-      ok: false,
+      name: "Off-chain bundle re-derivation",
+      ok: true,
+      kind: "info",
       detail:
-        "bundleRef is local:<hash> — this proof was minted before the iOS app uploaded the bundle to Swarm; the on-chain cosmoSig + bundleHash still verify, just no off-chain re-derivation",
+        "bundleRef is local:<hash> — bundle was kept device-side at mint time. On-chain commitments above still verify the proof; once the bundle is published to Swarm, satellite + device + visible-nonce checks become available too.",
     });
     return checks;
   }

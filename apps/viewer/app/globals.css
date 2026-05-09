@@ -219,6 +219,16 @@ a:hover {
   background: rgba(239, 107, 107, 0.06);
 }
 
+.badge-info {
+  border-color: rgba(126, 182, 255, 0.30);
+  background: rgba(126, 182, 255, 0.05);
+}
+
+.badge-warn {
+  border-color: rgba(244, 183, 64, 0.35);
+  background: rgba(244, 183, 64, 0.06);
+}
+
 .badge-icon {
   font-size: 16px;
   font-weight: 700;
@@ -239,6 +249,16 @@ a:hover {
 .badge-fail .badge-icon {
   background: var(--fail);
   color: #fff;
+}
+.badge-info .badge-icon {
+  background: var(--link);
+  color: #06182f;
+  font-style: italic;
+  font-weight: 700;
+}
+.badge-warn .badge-icon {
+  background: var(--warn);
+  color: #2d1f02;
 }
 
 .badge-name {
