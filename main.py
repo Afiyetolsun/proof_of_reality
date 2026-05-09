@@ -257,8 +257,13 @@ def build_pipeline(args, mgr, stop_event):
 
         stereo = pipeline.create(dai.node.StereoDepth).build(
             left=left_out, right=right_out,
-            presetMode=dai.node.StereoDepth.PresetMode.DEFAULT,
+            presetMode=dai.node.StereoDepth.PresetMode.DENSITY,
         )
+        # Subpixel ~halves depth-step quantisation past ~1 m; LR-check rejects
+        # pixels that don't agree across the two stereo views (kills most
+        # one-pixel "ghost" depths around object boundaries).
+        stereo.setSubpixel(True)
+        stereo.setLeftRightCheck(True)
 
         if platform == dai.Platform.RVC4:
             align = pipeline.create(dai.node.ImageAlign)
