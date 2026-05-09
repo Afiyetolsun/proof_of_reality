@@ -64,6 +64,13 @@ struct RoomPlanCaptureView: View {
         .navigationDestination(item: $summary) { payload in
             ProofSummaryView(payload: payload) { dismiss() }
         }
+        // When the summary is popped by ANY means (Done button, back arrow,
+        // swipe), also dismiss the capture view so the user lands on the
+        // root mode-picker. Without this they get a stale "Proof bundle
+        // built" screen they have to manually tap back through.
+        .onChange(of: summary) { oldValue, newValue in
+            if oldValue != nil && newValue == nil { dismiss() }
+        }
         .onDisappear {
             torch.turnOff()
             if controller.phase != .finished { controller.cancel() }

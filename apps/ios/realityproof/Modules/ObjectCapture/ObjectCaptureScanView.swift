@@ -53,6 +53,12 @@ struct ObjectCaptureScanView: View {
         .navigationDestination(item: $summary) { payload in
             ProofSummaryView(payload: payload) { dismiss() }
         }
+        // When the summary pops (any reason), dismiss the capture view so
+        // we don't strand the user on the post-capture "Proof bundle built"
+        // screen they have to manually back out of.
+        .onChange(of: summary) { oldValue, newValue in
+            if oldValue != nil && newValue == nil { dismiss() }
+        }
         .onDisappear {
             torch.turnOff()
             if !isPostCapture && controller.phase != .idle { controller.cancel() }
