@@ -14,7 +14,11 @@ set -euo pipefail
 
 BEE_API="${BEE_API:-http://localhost:1633}"
 STAMP_DEPTH="${STAMP_DEPTH:-20}"
-STAMP_AMOUNT="${STAMP_AMOUNT:-414720000}"
+# Days of validity to target. Amount is computed from the live network
+# price so we don't crash on "insufficient amount for 24h minimum validity"
+# when the price moves. Override either with env.
+STAMP_DAYS="${STAMP_DAYS:-14}"
+STAMP_AMOUNT="${STAMP_AMOUNT:-auto}"
 
 cmd="${1:-status}"
 
@@ -78,6 +82,21 @@ case "$cmd" in
     ;;
 
   stamp)
+    if [[ "$STAMP_AMOUNT" == "auto" ]]; then
+      # Read live price + compute amount for STAMP_DAYS of validity, with
+      # a 1.2× safety multiplier so a small price bump doesn't push us
+      # under the 24h minimum.  Gnosis: ~17280 blocks/day at 5s/block.
+      price=$(curl -fsS "$BEE_API/chainstate" | grep -o '"currentPrice":"[^"]*"' | cut -d'"' -f4)
+      if [[ -z "$price" ]]; then
+        echo "couldn't read currentPrice from /chainstate"; exit 1
+      fi
+      blocks_per_day=17280
+      amount=$(( price * blocks_per_day * STAMP_DAYS * 12 / 10 ))
+      STAMP_AMOUNT="$amount"
+      cost_plur=$(( amount * (1 << STAMP_DEPTH) ))
+      echo "auto-amount: ${STAMP_DAYS} days @ ${price} PLUR/block × 1.2 safety = ${amount}"
+      echo "             stamp cost ≈ $(awk "BEGIN{print $cost_plur/10^16}") BZZ"
+    fi
     echo "Buying postage batch: depth=$STAMP_DEPTH amount=$STAMP_AMOUNT"
     echo "(this submits a tx on Gnosis Chain — takes ~10s)"
     out=$(curl -fsS -X POST "$BEE_API/stamps/$STAMP_AMOUNT/$STAMP_DEPTH")
