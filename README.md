@@ -1,5 +1,9 @@
 # oak-scan-and-sign
 
+<p align="center">
+  <img src="assets/hero.gif" alt="Recording a room and signing the result with hardware-derived key" width="720">
+</p>
+
 Hardware-attested 3D room scanner. Capture a colored point cloud with a
 [Luxonis OAK4](https://docs.luxonis.com/) RGB-D camera and sign its hash
 with a hardware-derived key from a [USB Armory MK II](https://github.com/usbarmory/usbarmory)
@@ -11,6 +15,23 @@ scans to cryptographic proof so they can't be forged by AI.
 
 > Status: hackathon prototype. End-to-end working: record → SLAM → PLY →
 > SHA-256 → TEE-signed envelope.
+
+<table>
+<tr>
+  <td align="center" width="33%">
+    <img src="assets/ui-record.gif" alt="Recorder UI">
+    <br><sub>Web UI: Start → pan → Stop & sign</sub>
+  </td>
+  <td align="center" width="33%">
+    <img src="assets/pointcloud.gif" alt="Resulting point cloud rotating">
+    <br><sub>Output PLY: world-aligned colored cloud</sub>
+  </td>
+  <td align="center" width="33%">
+    <img src="assets/hardware.jpg" alt="OAK4 + USB Armory wired together">
+    <br><sub>Hardware: OAK4 + USB Armory MK II</sub>
+  </td>
+</tr>
+</table>
 
 ---
 
@@ -49,6 +70,12 @@ scans to cryptographic proof so they can't be forged by AI.
 ---
 
 ## Architecture
+
+<p align="center">
+  <img src="assets/architecture.png" alt="System architecture diagram" width="720">
+</p>
+
+(Same picture in ASCII for terminal-only readers:)
 
 ```
    ┌──── browser ────┐
@@ -159,6 +186,10 @@ oakctl app run .
 ```
 
 Open **http://&lt;oak-ip&gt;:8080** and hit Start.
+
+<p align="center">
+  <img src="assets/deploy.gif" alt="oakctl deploy + first scan" width="720">
+</p>
 
 ### 4. Local development (peripheral mode)
 
