@@ -211,24 +211,43 @@ struct ProofSummaryView: View {
         let icon = isStub ? "exclamationmark.shield.fill" : "shield.lefthalf.filled"
         let tint: Color = isStub ? .orange : .green
 
-        return VStack(alignment: .leading, spacing: 8) {
+        return VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Image(systemName: icon).foregroundStyle(tint)
                 Text(title).font(.headline)
             }
             keyValue("Tx", record.txHash.prefix(10) + "…" + record.txHash.suffix(8))
             keyValue("Token", "#\(record.tokenId)")
-            if let ens = record.ensName { keyValue("ENS", ens) }
+
+            // ENS handle — the canonical, shareable identifier for this proof.
+            // Renders the name in monospace + a copy button so it reads as a
+            // resolvable address rather than a label.
+            if let name = record.ensName, !name.isEmpty {
+                ensRow(name: name)
+            }
 
             if let url = record.explorerURL {
-                Link(destination: url) {
-                    Label("View on Basescan", systemImage: "arrow.up.right.square")
-                        .font(.subheadline.bold())
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
+                HStack(spacing: 8) {
+                    Link(destination: url) {
+                        Label("Basescan", systemImage: "arrow.up.right.square")
+                            .font(.subheadline.bold())
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(tint)
+
+                    if let ens = record.ensURL {
+                        Link(destination: ens) {
+                            Label("ENS", systemImage: "globe")
+                                .font(.subheadline.bold())
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 8)
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(tint)
+                    }
                 }
-                .buttonStyle(.bordered)
-                .tint(tint)
                 .padding(.top, 4)
             } else if isStub {
                 Text("The relay's MINTER_PRIVATE_KEY or REALITY_PROOF_ADDRESS isn't set yet, so no on-chain transaction was created.")
@@ -241,6 +260,32 @@ struct ProofSummaryView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(tint.opacity(0.12),
                     in: RoundedRectangle(cornerRadius: 14))
+    }
+
+    /// Two-line ENS row: small label then the subname in monospace, plus a
+    /// copy button. Tap-and-hold also works via .textSelection(.enabled).
+    private func ensRow(name: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("ENS HANDLE")
+                .font(.caption2.bold())
+                .foregroundStyle(.secondary)
+            HStack(alignment: .center, spacing: 8) {
+                Text(name)
+                    .font(.footnote.monospaced())
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .textSelection(.enabled)
+                Button {
+                    UIPasteboard.general.string = name
+                } label: {
+                    Image(systemName: "doc.on.doc")
+                        .font(.footnote)
+                }
+                .buttonStyle(.borderless)
+                .accessibilityLabel("Copy ENS handle")
+            }
+        }
+        .padding(.vertical, 2)
     }
 
     private func failedCard(message: String) -> some View {

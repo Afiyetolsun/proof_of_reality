@@ -15,4 +15,11 @@ struct MintRecord: Codable, Hashable {
         if stub == true { return nil }
         return URL(string: "https://sepolia.basescan.org/tx/\(txHash)")
     }
+
+    /// ENS app URL for the per-mint subname. Returns nil if the relay
+    /// didn't publish ENS records (e.g. no ENS_RESOLVER_ADDRESS set).
+    var ensURL: URL? {
+        guard let name = ensName, !name.isEmpty else { return nil }
+        return URL(string: "https://sepolia.app.ens.domains/\(name)")
+    }
 }
