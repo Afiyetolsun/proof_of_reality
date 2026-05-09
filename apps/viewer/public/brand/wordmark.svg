@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 64" role="img" aria-label="Proof of Reality">
+  <title>Proof of Reality</title>
+  <!-- mark, left-aligned, 64x64 -->
+  <g>
+    <circle cx="32" cy="32" r="2.6" fill="#ec9247"/>
+    <circle cx="32" cy="32" r="11" fill="none" stroke="#ec9247" stroke-width="1.4"/>
+    <circle cx="32" cy="32" r="23" fill="none" stroke="#ec9247" stroke-width="0.85" stroke-dasharray="1.6 3.2"/>
+    <circle cx="52.84" cy="22.28" r="2.4" fill="#ec9247"/>
+  </g>
+  <!-- type lockup, baseline-aligned to mark center -->
+  <text x="80" y="40" fill="#ec9247"
+        font-family="ui-monospace, 'SF Mono', Menlo, monospace"
+        font-size="22" letter-spacing="-0.005em" font-weight="500">proof of reality.</text>
+</svg>

@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img" aria-label="Proof of Reality — Web3 oracle for the physical world">
+  <title>Proof of Reality</title>
+  <desc>Five witnesses on every scan. Not generatable by AI, not pre-recordable, not forgeable on the ground.</desc>
+
+  <!-- surface -->
+  <rect width="1200" height="630" fill="#090e12"/>
+
+  <!-- right-side ornament: large orbital echo of the mark -->
+  <g transform="translate(900 315)" opacity="0.85">
+    <circle r="6" fill="#ec9247"/>
+    <circle r="68" fill="none" stroke="#ec9247" stroke-width="1.8"/>
+    <circle r="156" fill="none" stroke="#ec9247" stroke-width="1.0" stroke-dasharray="2.2 4.4"/>
+    <circle r="228" fill="none" stroke="#ec9247" stroke-width="0.6" stroke-dasharray="1.4 6" opacity="0.55"/>
+    <!-- one prominent satellite on the dotted orbit, top-right -->
+    <circle cx="141.4" cy="-66.0" r="6" fill="#ec9247"/>
+  </g>
+
+  <!-- top: wordmark lockup -->
+  <g transform="translate(80 80)">
+    <g>
+      <circle cx="24" cy="24" r="2.0" fill="#ec9247"/>
+      <circle cx="24" cy="24" r="8.4" fill="none" stroke="#ec9247" stroke-width="1.1"/>
+      <circle cx="24" cy="24" r="17.6" fill="none" stroke="#ec9247" stroke-width="0.65" stroke-dasharray="1.2 2.4"/>
+      <circle cx="40" cy="16.6" r="1.85" fill="#ec9247"/>
+    </g>
+    <text x="60" y="32" fill="#ec9247"
+          font-family="ui-monospace, 'SF Mono', Menlo, monospace"
+          font-size="20" letter-spacing="-0.005em" font-weight="500">proof of reality.</text>
+  </g>
+
+  <!-- eyebrow -->
+  <text x="80" y="246" fill="#aeaaa2"
+        font-family="ui-monospace, 'SF Mono', Menlo, monospace"
+        font-size="14" letter-spacing="2.0" font-weight="500">WEB3 ORACLE FOR THE PHYSICAL WORLD</text>
+
+  <!-- display headline -->
+  <text x="80" y="332" fill="#f8f5ef"
+        font-family="-apple-system, system-ui, sans-serif"
+        font-size="76" letter-spacing="-1.6" font-weight="600">Five witnesses</text>
+  <text x="80" y="412" fill="#f8f5ef"
+        font-family="-apple-system, system-ui, sans-serif"
+        font-size="76" letter-spacing="-1.6" font-weight="600">on every scan.</text>
+
+  <!-- subline -->
+  <text x="80" y="466" fill="#aeaaa2"
+        font-family="-apple-system, system-ui, sans-serif"
+        font-size="22" letter-spacing="-0.2" font-weight="400">Not generatable by AI. Not pre-recordable. Not forgeable on the ground.</text>
+
+  <!-- footer rule -->
+  <line x1="80" y1="540" x2="1120" y2="540" stroke="#292e35" stroke-width="1"/>
+
+  <!-- bottom-left: mono cryptographic signature (visual identity per brand guideline) -->
+  <text x="80" y="582" fill="#ec9247"
+        font-family="ui-monospace, 'SF Mono', Menlo, monospace"
+        font-size="15" letter-spacing="-0.005em" font-weight="500">0x7e3a2f8b1c…</text>
+  <text x="220" y="582" fill="#aeaaa2"
+        font-family="ui-monospace, 'SF Mono', Menlo, monospace"
+        font-size="15" letter-spacing="-0.005em" font-weight="400">bundleHash · base sepolia</text>
+
+  <!-- bottom-right: track / venue -->
+  <text x="1120" y="582" text-anchor="end" fill="#aeaaa2"
+        font-family="ui-monospace, 'SF Mono', Menlo, monospace"
+        font-size="14" letter-spacing="2.0" font-weight="500">ETHPRAGUE 2026</text>
+</svg>

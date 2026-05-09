@@ -15,15 +15,30 @@ export const metadata: Metadata = {
     url: "https://proof-of-reality.xyz",
     siteName: "Proof of Reality",
     type: "website",
+    images: [
+      {
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "Proof of Reality — Web3 oracle for the physical world",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
     title: "Proof of Reality",
     description:
       "Web3 oracle for the physical world. Orbital-anchored verification of physical objects.",
+    images: ["/og-image.png"],
   },
   icons: {
-    icon: "/favicon.svg",
+    icon: [
+      { url: "/favicon.svg", type: "image/svg+xml" },
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: "/apple-touch-icon.png",
+    shortcut: "/favicon.svg",
   },
 };
 

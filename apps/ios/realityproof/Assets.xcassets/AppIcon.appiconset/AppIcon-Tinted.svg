@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- transparent background; iOS recomposites with the user's tint over a dark substrate -->
+  <circle cx="512" cy="512" r="42" fill="#ffffff"/>
+  <circle cx="512" cy="512" r="180" fill="none" stroke="#ffffff" stroke-width="22"/>
+  <circle cx="512" cy="512" r="380" fill="none" stroke="#ffffff" stroke-width="13" stroke-dasharray="26 52"/>
+  <circle cx="856.4" cy="351.5" r="40" fill="#ffffff"/>
+</svg>

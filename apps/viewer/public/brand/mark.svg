@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="none" role="img" aria-label="Proof of Reality">
+  <title>Proof of Reality</title>
+  <!-- proof point: a single physical object pinned in space -->
+  <circle cx="32" cy="32" r="2.6" fill="#ec9247"/>
+  <!-- anchor ring: device + on-chain registry -->
+  <circle cx="32" cy="32" r="11" fill="none" stroke="#ec9247" stroke-width="1.4"/>
+  <!-- satellite orbit: cosmic-nonce path, dotted -->
+  <circle cx="32" cy="32" r="23" fill="none" stroke="#ec9247" stroke-width="0.85" stroke-dasharray="1.6 3.2"/>
+  <!-- one witness on the orbit -->
+  <circle cx="52.84" cy="22.28" r="2.4" fill="#ec9247"/>
+</svg>
