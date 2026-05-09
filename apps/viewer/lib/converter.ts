@@ -38,45 +38,58 @@ async function probeFormat(beeRef: string): Promise<string | null> {
   }
 }
 
-const USDZ_HINTS = ["usdz", "usd"];
 const GLB_HINTS = ["gltf-binary", "model/gltf"];
 
 /**
- * If the record's contenthash points at a USDZ on Swarm AND the
+ * If the record's contenthash points at content on Swarm AND the
  * converter is configured, returns a new EnsRecord whose `content`
  * field has been swapped for the converted GLB ref. Otherwise returns
  * the record unchanged.
  *
- * Failure modes degrade silently — converter down, conversion error,
- * unknown format — all return the original record so the page still
- * renders (just with the QuickLook fallback for USDZ scenes).
+ * We only short-circuit the converter call for *confirmed* GLB content.
+ * If the format probe is inconclusive (the public Swarm gateway is
+ * flaky from serverless networks — HEAD often returns no content-type
+ * or stalls), we still ask the converter rather than silently falling
+ * back to the QuickLook card. The converter holds its own JSON cache
+ * keyed on USDZ ref, so a known ref answers in ~50 ms whether or not
+ * the gateway probe succeeded.
+ *
+ * No fetch caching: the converter is the cache. Vercel's data cache
+ * used to retain transient converter failures and serve them
+ * indefinitely; `cache: "no-store"` keeps every request fresh while
+ * the converter's disk cache keeps it cheap.
+ *
+ * Failure modes degrade to the original record so the page still
+ * renders the QuickLook fallback rather than erroring.
  */
 export async function maybeConvertScene(record: EnsRecord): Promise<EnsRecord> {
   if (!CONVERTER_URL || !record.content || record.content.protocol !== "bzz") {
     return record;
   }
 
+  // Only skip the converter when we're *certain* the content is already
+  // GLB. Inconclusive probes (gateway 4xx, missing content-type, network
+  // flake) should still hit the converter — its cache is authoritative.
   const ct = await probeFormat(record.content.ref);
-  if (!ct) return record;
-
-  // Already renderable in-canvas → skip the converter
-  if (GLB_HINTS.some((h) => ct.includes(h))) return record;
-
-  // Not USDZ → unknown format, skip
-  if (!USDZ_HINTS.some((h) => ct.includes(h))) return record;
+  if (ct && GLB_HINTS.some((h) => ct.includes(h))) {
+    return record;
+  }
 
   try {
     const convertUrl = `${CONVERTER_URL}/convert?ref=${record.content.ref}&proto=bzz`;
-    const res = await fetch(convertUrl, {
-      cache: "force-cache",  // Swarm is content-addressed, GLB ref never changes
-    });
+    const res = await fetch(convertUrl, { cache: "no-store" });
     if (!res.ok) {
       console.warn(`[converter] ${convertUrl} → ${res.status}`);
       return record;
     }
     const json = (await res.json()) as { glbRef?: string };
-    if (!json.glbRef) return record;
-
+    if (!json.glbRef) {
+      console.warn(`[converter] ${convertUrl} returned no glbRef`);
+      return record;
+    }
+    console.log(
+      `[converter] ${record.content.ref.slice(0, 12)}… → ${json.glbRef.slice(0, 12)}…`,
+    );
     return {
       ...record,
       content: { protocol: "bzz", ref: json.glbRef },
