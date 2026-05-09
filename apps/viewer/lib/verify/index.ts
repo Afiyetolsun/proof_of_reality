@@ -22,14 +22,58 @@ export async function runVerification(proof: unknown): Promise<VerificationCheck
 
   // 0. Fetch the canonical bundle JSON from Swarm (verified)
   const p = proof as { bundleRef: string; swarmRef: string };
-  const bundleRes = await verifiedFetch(p.bundleRef, { gateway: SWARM_GATEWAY });
+
+  // Older mints have bundleRef = "local:<sha>" (iOS skipped the upload
+  // because the scene exceeded the relay payload cap). Nothing on
+  // Swarm to fetch — surface this clearly instead of letting verifiedFetch
+  // throw a confusing 400 the user can't act on.
+  if (!p.bundleRef || p.bundleRef.startsWith("local:")) {
+    checks.push({
+      name: "Bundle fetch",
+      ok: false,
+      detail:
+        "bundleRef is local:<hash> — this proof was minted before the iOS app uploaded the bundle to Swarm; the on-chain cosmoSig + bundleHash still verify, just no off-chain re-derivation",
+    });
+    return checks;
+  }
+
+  let bundleRes;
+  try {
+    bundleRes = await verifiedFetch(p.bundleRef, { gateway: SWARM_GATEWAY });
+  } catch (e) {
+    checks.push({
+      name: "Bundle fetch",
+      ok: false,
+      detail: `gateway: ${(e as Error).message}`,
+    });
+    return checks;
+  }
+
   if (!bundleRes.verified) {
     checks.push({ name: "Swarm content addressing", ok: false, detail: "bundle CAC mismatch" });
     return checks;
   }
   checks.push({ name: "Swarm content addressing", ok: true, detail: bundleRes.scope });
 
-  const bundle = parseProofBundle(JSON.parse(new TextDecoder().decode(bundleRes.data)));
+  // Defensive parse — if iOS uploaded the wrong file (e.g. the scene
+  // USDZ instead of the bundle JSON, "PK..." being the ZIP magic), the
+  // JSON.parse throws synchronously and crashes the page. Surface as
+  // a clean check instead.
+  let bundle;
+  try {
+    const text = new TextDecoder().decode(bundleRes.data);
+    bundle = parseProofBundle(JSON.parse(text));
+  } catch (e) {
+    const head = new TextDecoder()
+      .decode(bundleRes.data.slice(0, 16))
+      .replace(/[^\x20-\x7e]/g, ".");
+    checks.push({
+      name: "Bundle parse",
+      ok: false,
+      detail: `bundleRef pointed at non-JSON ("${head}…") — iOS likely sent the scene ref as bundleRef. ${(e as Error).message}`,
+    });
+    return checks;
+  }
 
   // 1. Satellite signature on cosmic nonce
   const satOk = await verifySatSig(bundle.nonce);
