@@ -5,6 +5,8 @@ import hashlib
 import json
 import os
 import secrets
+import subprocess
+import sys
 import threading
 import time
 import uuid
@@ -462,55 +464,64 @@ def _clean_mesh(mesh):
     return mesh
 
 
-def _poisson_reconstruct(pcd, depth=9, density_quantile=0.05):
-    """Screened-Poisson surface reconstruction with low-density crop.
+_POISSON_TIMEOUT_S = 180
 
-    Returns a watertight TriangleMesh that's far less "Swiss cheese" than
-    raw marching-cubes from a sparsely-observed TSDF, at the cost of
-    extrapolating geometry on the unseen side. We crop the lowest-density
-    Poisson vertices (default bottom 5%) which is the standard fix for
-    the ballooning artifact behind the camera.
 
-    Returns None if reconstruction fails (e.g. pcd too sparse for normal
-    estimation).
+def _poisson_reconstruct(scan_id, pcd_path):
+    """Run Poisson reconstruction in a subprocess.
+
+    The previous in-process version could take down the FastAPI server
+    when Open3D's Poisson C++ code crashed (the "Failed to close loop"
+    isosurface path, or kernel OOM-killer on the OAK4). A subprocess
+    contains the blast radius: any C++ abort / OOM kill / Python crash
+    in the worker yields a non-zero exit, which we treat as "no Poisson
+    artifact this scan" and the rest of the envelope is unaffected.
+
+    Returns (out_path, info_dict) on success, (None, None) otherwise.
+    Set POISSON_DISABLE=1 to skip entirely (recommended if you're
+    debugging some other crash and want to exclude Poisson as a
+    suspect).
     """
-    n_pts = len(pcd.points)
-    if n_pts < 500:
-        return None
+    if os.environ.get("POISSON_DISABLE") == "1":
+        return None, None
+
+    worker = ROOT / "poisson_worker.py"
+    if not worker.exists():
+        print(f"[poisson] worker missing at {worker}, skipping")
+        return None, None
+
+    out_path = SCANS_DIR / f"{scan_id}.poisson.ply"
     try:
-        # Work on a copy so we don't mutate the PCD that's about to be
-        # written as the primary signed artifact.
-        p = o3d.geometry.PointCloud(pcd)
-        # Normal estimation needs a search radius / k. Use the cloud's
-        # own scale: the TSDF voxel length is a sensible neighbourhood.
-        p.estimate_normals(
-            search_param=o3d.geometry.KDTreeSearchParamHybrid(
-                radius=0.05, max_nn=30))
-        # Make normals point outward consistently --- Poisson is sensitive
-        # to flips. The tangent-plane MST orientation works well on
-        # surfaces with reasonable density.
-        p.orient_normals_consistent_tangent_plane(k=30)
-
-        mesh, densities = o3d.geometry.TriangleMesh.create_from_point_cloud_poisson(
-            p, depth=depth, n_threads=-1)
-        if mesh is None or len(mesh.triangles) == 0:
-            return None
-
-        densities = np.asarray(densities)
-        if len(densities) > 0:
-            cutoff = float(np.quantile(densities, density_quantile))
-            drop_v = densities < cutoff
-            if drop_v.any():
-                mesh.remove_vertices_by_mask(drop_v)
-
-        if len(mesh.triangles) == 0:
-            return None
-
-        mesh.compute_vertex_normals()
-        return mesh
+        proc = subprocess.run(
+            [sys.executable, str(worker), str(pcd_path), str(out_path)],
+            capture_output=True, timeout=_POISSON_TIMEOUT_S,
+        )
+    except subprocess.TimeoutExpired:
+        print(f"[poisson] worker timed out after {_POISSON_TIMEOUT_S}s")
+        return None, None
     except Exception as e:
-        print(f"[poisson] reconstruct failed: {type(e).__name__}: {e}")
-        return None
+        print(f"[poisson] subprocess.run failed: {type(e).__name__}: {e}")
+        return None, None
+
+    stdout = proc.stdout.decode("utf-8", "replace").strip()
+    stderr = proc.stderr.decode("utf-8", "replace").strip()
+    if proc.returncode != 0:
+        print(f"[poisson] worker exit={proc.returncode} "
+              f"stdout={stdout!r} stderr={stderr!r}")
+        return None, None
+
+    info = {}
+    if stdout:
+        try:
+            info = json.loads(stdout.splitlines()[-1])
+        except Exception:
+            pass
+
+    if not out_path.exists() or out_path.stat().st_size == 0:
+        print(f"[poisson] worker reported success but no output at {out_path}")
+        return None, None
+
+    return out_path, info
 
 
 def write_cloud(scan_id, pcd, mesh):
@@ -544,21 +555,18 @@ def write_cloud(scan_id, pcd, mesh):
             extra['vertex_count'] = int(len(mesh.vertices))
             extra['triangle_count'] = int(len(mesh.triangles))
 
-    # Poisson reconstruction is the "looks solid" sibling output. Built
-    # from the cleaned PCD (so it benefits from the statistical-outlier
-    # pass already applied above), watertight, fills the holes that
-    # marching-cubes leaves around sparse TSDF voxels. Extrapolates on
-    # the unseen back side --- low-density crop in _poisson_reconstruct
-    # keeps that within reason.
-    poisson_mesh = _poisson_reconstruct(pcd)
-    if poisson_mesh is not None and len(poisson_mesh.triangles) > 0:
-        poisson_path = SCANS_DIR / f"{scan_id}.poisson.ply"
-        o3d.io.write_triangle_mesh(str(poisson_path), poisson_mesh,
-                                   write_ascii=False)
+    # Poisson reconstruction is the "looks solid" sibling output ---
+    # watertight surface that fills the holes marching-cubes leaves
+    # around sparse TSDF voxels. Runs in a subprocess so any C++ crash
+    # in Open3D's PoissonRecon (the `Failed to close loop` isosurface
+    # path or a kernel OOM-kill on the OAK4) is contained; the primary
+    # PCD + marching-cubes mesh on disk above are unaffected.
+    poisson_path, poisson_info = _poisson_reconstruct(scan_id, pcd_path)
+    if poisson_path is not None:
         extra['poisson_artifact'] = poisson_path.name
         extra['poisson_sha256'] = _hash_file(poisson_path)
-        extra['poisson_vertex_count'] = int(len(poisson_mesh.vertices))
-        extra['poisson_triangle_count'] = int(len(poisson_mesh.triangles))
+        extra['poisson_vertex_count'] = int(poisson_info.get('vertex_count', 0))
+        extra['poisson_triangle_count'] = int(poisson_info.get('triangle_count', 0))
 
     return pcd_path, extra
 
