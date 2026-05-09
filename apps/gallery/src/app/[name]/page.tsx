@@ -6,10 +6,17 @@
  *
  * Resolves the ENS subname on Eth Sepolia, fetches the on-chain proof
  * struct on Base Sepolia by tokenId, fetches the canonical bundle from
- * Swarm, runs the five-witness verification chain, and renders the 3D
- * scene inline via <model-viewer>. USDZ contenthashes are rewritten
- * to their cached GLB equivalents by lib/converter.ts (server-side)
- * before this page renders.
+ * Swarm, runs the witness verification chain, and renders the 3D scene
+ * inline via <model-viewer>. USDZ contenthashes are rewritten to their
+ * cached GLB equivalents by lib/converter.ts (server-side) before this
+ * page renders.
+ *
+ * Layout intentionally mirrors apps/viewer/app/[name]/page.tsx — same
+ * centered diamond + mono name hero, same single-column card stack —
+ * so visitors get one consistent visual language whether they land on
+ * the standalone viewer or the gallery's detail page. Gallery's wider
+ * Header/Footer chrome is dropped here because it competes with the
+ * focused proof view.
  *
  * Anyone with the URL can verify end-to-end — no app, no wallet.
  */
@@ -19,10 +26,6 @@ import { resolveEnsName, contentUrl, directContentUrl, normalizeName } from "@/l
 import { maybeConvertScene } from "@/lib/converter.js";
 import { getProof, ChainConfigMissingError } from "@/lib/chain/index.js";
 import { runVerification } from "@/lib/verify/index.js";
-import { Header } from "@/components/Header";
-import { Footer } from "@/components/Footer";
-import { Mono, shortHex, shortAddress } from "@/components/Mono";
-import { Eyebrow } from "@/components/Eyebrow";
 import { ProofScene } from "./ProofScene";
 import { Badges } from "./Badges";
 import { ShareButton } from "./ShareButton";
@@ -70,157 +73,178 @@ export default async function NamePage({ params }: PageProps) {
     process.env.NEXT_PUBLIC_ENS_APP_BASE_URL ?? "https://sepolia.app.ens.domains";
 
   return (
-    <>
-      <Header />
-      <main id="content" className="container-page pb-12 pt-6 md:pt-10">
-        <Link
-          href="/"
-          className="text-mono-s text-[--color-ink-mute] underline decoration-transparent underline-offset-4 transition-colors hover:text-[--color-ink] hover:decoration-[--color-signal]"
-        >
-          ← all scans
-        </Link>
+    <main
+      id="content"
+      className="mx-auto flex max-w-[880px] flex-col gap-6 px-5 pb-20 pt-8"
+    >
+      <header className="px-2 pb-2 pt-6 text-center">
+        <div className="mb-3 inline-flex items-center gap-3">
+          <span
+            aria-hidden
+            className="text-[28px] leading-none text-[--color-signal]"
+            style={{ filter: "drop-shadow(0 0 12px oklch(0.74 0.14 58 / 0.40))" }}
+          >
+            ◆
+          </span>
+          <h1 className="m-0 break-all font-mono text-display-m text-[--color-ink]">
+            {record.name}
+          </h1>
+        </div>
+        <p className="mx-auto mb-5 mt-2 max-w-[540px] text-body text-[--color-ink-mute]">
+          Cryptographic capture of physical reality. Verified by independent
+          witnesses.
+        </p>
+        <ShareButton name={record.name} />
+      </header>
 
-        <header className="mt-6 flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
-          <div className="min-w-0">
-            <Eyebrow signal>Reality NFT</Eyebrow>
-            <h1 className="mt-3 break-all text-display-m font-mono text-[--color-ink]">
-              {record.name}
-            </h1>
-            <p className="mt-3 max-w-[60ch] text-body text-[--color-ink-mute]">
-              Cryptographic capture of physical reality. Verified by independent witnesses;
-              click each row below to read what it checks.
-            </p>
-          </div>
-          <ShareButton name={record.name} />
-        </header>
+      {sceneUrl && (
+        <ProofScene
+          url={sceneUrl}
+          attestor={record.attestor ?? undefined}
+          mode={record.mode ?? undefined}
+        />
+      )}
 
-        {sceneUrl && (
-          <section className="mt-10">
-            <ProofScene
-              url={sceneUrl}
-              attestor={record.attestor ?? undefined}
-              mode={record.mode ?? undefined}
-            />
-          </section>
+      <section className="rounded-[20px] border border-[--color-rule] bg-[--color-surface-raised] px-6 py-5">
+        <h2 className="m-0 mb-3.5 text-eyebrow font-mono uppercase tracking-[0.08em] text-[--color-ink-mute]">
+          Verification
+        </h2>
+        {checks.length === 0 && record.tokenId === null && (
+          <p className="text-body-s text-[--color-ink-mute]">
+            ENS records are still propagating (newly-minted proofs take ~25 s
+            for the on-chain side to finalize). Refresh in a moment.
+          </p>
         )}
+        {checks.length === 0 && record.tokenId !== null && chainConfigMissing && (
+          <p className="text-body-s text-[--color-ink-mute]">
+            On-chain witness verification is offline (deployment env vars
+            unset). The ENS records below still prove the mint happened.
+          </p>
+        )}
+        {checks.length === 0 && record.tokenId !== null && !chainConfigMissing && (
+          <p className="text-body-s text-[--color-ink-mute]">
+            Couldn&apos;t fetch on-chain proof — see browser console.
+          </p>
+        )}
+        {checks.length > 0 && <Badges checks={checks} />}
+      </section>
 
-        <section className="mt-10 grid grid-cols-1 gap-6 lg:grid-cols-12">
-          <div className="lg:col-span-7">
-            <Eyebrow>Verification</Eyebrow>
-            <h2 className="mt-3 text-h2 text-[--color-ink]">Witnesses</h2>
-            <div className="mt-5">
-              {checks.length === 0 && record.tokenId === null && (
-                <p className="text-body-s text-[--color-ink-mute]">
-                  ENS records are still propagating (newly-minted proofs take ~25s for the
-                  on-chain side to finalize). Refresh in a moment.
-                </p>
-              )}
-              {checks.length === 0 && record.tokenId !== null && chainConfigMissing && (
-                <p className="text-body-s text-[--color-ink-mute]">
-                  On-chain witness verification is offline (deployment env vars unset). The
-                  ENS records below still prove the mint happened.
-                </p>
-              )}
-              {checks.length === 0 && record.tokenId !== null && !chainConfigMissing && (
-                <p className="text-body-s text-[--color-ink-mute]">
-                  Couldn&apos;t fetch on-chain proof — see browser console.
-                </p>
-              )}
-              {checks.length > 0 && <Badges checks={checks} />}
-            </div>
-          </div>
-
-          <div className="lg:col-span-5">
-            <Eyebrow>Proof bundle</Eyebrow>
-            <h2 className="mt-3 text-h2 text-[--color-ink]">Records</h2>
-            <dl className="mt-5 grid grid-cols-[max-content_1fr] gap-x-5 gap-y-3 text-body-s">
-              {record.tokenId !== null && (
-                <KV label="token">
-                  <span className="text-[--color-ink]">#{record.tokenId.toString()}</span>
-                  {record.url && (
-                    <>
-                      {"  "}
-                      <a
-                        href={record.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-mono-s text-[--color-signal] underline decoration-transparent underline-offset-4 hover:decoration-[--color-signal]"
-                      >
-                        basescan ↗
-                      </a>
-                    </>
-                  )}
-                </KV>
-              )}
-              {record.bundleHash && (
-                <KV label="bundle">
-                  <Mono className="text-mono-s break-all" title={record.bundleHash}>
-                    {record.bundleHash}
-                  </Mono>
-                </KV>
-              )}
-              {record.attestor && (
-                <KV label="attestor">
-                  <Mono className="text-mono-s" title={record.attestor}>
-                    {shortAddress(record.attestor)}
-                  </Mono>
-                </KV>
-              )}
-              {record.cosmoSig && (
-                <KV label="kms cosig">
-                  <Mono className="text-mono-s" title={record.cosmoSig}>
-                    {shortHex(record.cosmoSig)}
-                  </Mono>
-                </KV>
-              )}
-              {record.satSig && record.satSig !== "STUB" && (
-                <KV label="satellite">
-                  <Mono className="text-mono-s" title={record.satSig}>
-                    {shortHex(record.satSig)}
-                  </Mono>
-                </KV>
-              )}
-              {record.mode && <KV label="mode">{record.mode}</KV>}
-              {record.capturedAt && <KV label="captured">{fmtDate(record.capturedAt)}</KV>}
-              {record.content && (
-                <KV label="storage">
+      <section className="rounded-[20px] border border-[--color-rule] bg-[--color-surface-raised] px-6 py-5">
+        <h2 className="m-0 mb-3.5 text-eyebrow font-mono uppercase tracking-[0.08em] text-[--color-ink-mute]">
+          Proof bundle
+        </h2>
+        <dl className="grid grid-cols-[minmax(120px,auto)_1fr] gap-x-5 gap-y-3 text-body-s">
+          {record.tokenId !== null && (
+            <KV label="Token">
+              <span className="text-[--color-ink]">
+                #{record.tokenId.toString()}
+              </span>
+              {record.url && (
+                <>
+                  {" "}
                   <a
-                    href={directContentUrl(record.content)}
+                    href={record.url}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-mono-s text-[--color-ink] underline decoration-transparent underline-offset-4 hover:text-[--color-signal] hover:decoration-[--color-signal]"
+                    className="text-mono-s text-[--color-signal] underline decoration-transparent underline-offset-4 hover:decoration-[--color-signal]"
                   >
-                    {record.content.protocol}://{record.content.ref.slice(0, 14)}… ↗
+                    Basescan ↗
                   </a>
-                </KV>
+                </>
               )}
-            </dl>
-
-            <div className="mt-6 border-t border-[--color-rule] pt-4">
+            </KV>
+          )}
+          {record.bundleHash && (
+            <KV label="Bundle hash">
+              <span className="break-all font-mono text-mono-s text-[--color-ink]">
+                {record.bundleHash}
+              </span>
+            </KV>
+          )}
+          {record.attestor && (
+            <KV label="Attestor">
+              <span className="break-all font-mono text-mono-s text-[--color-ink]">
+                {record.attestor}
+              </span>
+            </KV>
+          )}
+          {record.cosmoSig && (
+            <KV label="KMS co-signature">
+              <span
+                className="font-mono text-mono-s text-[--color-ink]"
+                title={record.cosmoSig}
+              >
+                {shortHex(record.cosmoSig)}
+              </span>
+            </KV>
+          )}
+          {record.satSig && record.satSig !== "STUB" && (
+            <KV label="Satellite signature">
+              <span
+                className="font-mono text-mono-s text-[--color-ink]"
+                title={record.satSig}
+              >
+                {shortHex(record.satSig)}
+              </span>
+            </KV>
+          )}
+          {record.mode && (
+            <KV label="Capture mode">
+              <span className="text-[--color-ink]">{record.mode}</span>
+            </KV>
+          )}
+          {record.capturedAt && (
+            <KV label="Captured">
+              <span className="text-[--color-ink]">{fmtDate(record.capturedAt)}</span>
+            </KV>
+          )}
+          {record.content && (
+            <KV label="Storage">
               <a
-                href={`${ensAppBase}/${record.name}`}
+                href={directContentUrl(record.content)}
                 target="_blank"
                 rel="noreferrer"
-                className="text-mono-s text-[--color-ink-mute] underline decoration-transparent underline-offset-4 hover:text-[--color-ink] hover:decoration-[--color-signal]"
+                className="font-mono text-mono-s text-[--color-ink] underline decoration-transparent underline-offset-4 hover:text-[--color-signal] hover:decoration-[--color-signal]"
               >
-                view on ens app ↗
+                {record.content.protocol}://{record.content.ref.slice(0, 14)}… ↗
               </a>
-            </div>
-          </div>
-        </section>
-      </main>
-      <Footer />
-    </>
+            </KV>
+          )}
+        </dl>
+      </section>
+
+      <footer className="mt-2 flex items-center justify-between border-t border-[--color-rule] pt-4 text-mono-s text-[--color-ink-mute]">
+        <Link
+          href="/"
+          className="transition-colors hover:text-[--color-ink]"
+        >
+          ← Proof of Reality
+        </Link>
+        <a
+          href={`${ensAppBase}/${record.name}`}
+          target="_blank"
+          rel="noreferrer"
+          className="transition-colors hover:text-[--color-ink]"
+        >
+          View on ENS app ↗
+        </a>
+      </footer>
+    </main>
   );
 }
 
 function KV({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <>
-      <dt className="text-mono-xs text-[--color-ink-faint]">{label}</dt>
-      <dd className="min-w-0 text-[--color-ink]">{children}</dd>
+      <dt className="text-[--color-ink-mute]">{label}</dt>
+      <dd className="m-0 min-w-0 break-words text-[--color-ink]">{children}</dd>
     </>
   );
+}
+
+function shortHex(hex: string, head = 8, tail = 8): string {
+  if (hex.length <= head + tail + 3) return hex;
+  return `${hex.slice(0, head)}…${hex.slice(-tail)}`;
 }
 
 function ErrorView({
@@ -232,29 +256,32 @@ function ErrorView({
   message: string;
   name: string;
 }) {
-  const copy: Record<typeof kind, { title: string; tagline: React.ReactNode; hint: string }> =
+  const copy: Record<typeof kind, { icon: string; title: string; tagline: React.ReactNode; hint: string }> =
     {
       NOT_FOUND: {
+        icon: "🔍",
         title: "No proof at this name",
         tagline: (
           <>
             Nothing minted under{" "}
-            <span className="text-mono text-[--color-ink]">{name}</span> yet.
+            <span className="font-mono text-[--color-ink]">{name}</span> yet.
           </>
         ),
         hint: "Names look like vin-<12hex>.realityproof.eth or your-chosen-name.realityproof.eth",
       },
       NOT_OUR_RESOLVER: {
+        icon: "🔗",
         title: "Wrong resolver",
         tagline: (
           <>
-            <span className="text-mono text-[--color-ink]">{name}</span> exists in ENS but
-            isn&apos;t pointed at our resolver, so it&apos;s not a Reality NFT.
+            <span className="font-mono text-[--color-ink]">{name}</span> exists in ENS
+            but isn&apos;t pointed at our resolver, so it&apos;s not a Reality NFT.
           </>
         ),
         hint: "Reality NFT names use a custom resolver on Eth Sepolia.",
       },
       RPC_ERROR: {
+        icon: "⚡",
         title: "RPC blip",
         tagline: <>Couldn&apos;t reach the Ethereum Sepolia node — try again in a moment.</>,
         hint: message,
@@ -264,22 +291,18 @@ function ErrorView({
   const c = copy[kind];
 
   return (
-    <>
-      <Header />
-      <main id="content" className="container-page pb-20 pt-16">
-        <Eyebrow>Error</Eyebrow>
-        <h1 className="mt-3 text-display-m text-[--color-ink]">{c.title}</h1>
-        <p className="mt-4 text-body text-[--color-ink-mute]">{c.tagline}</p>
-        <p className="mt-2 text-mono-s text-[--color-ink-faint]">{c.hint}</p>
-        <Link
-          href="/"
-          className="mt-8 inline-block text-mono-s text-[--color-signal] underline decoration-transparent underline-offset-4 hover:decoration-[--color-signal]"
-        >
-          ← back to gallery
-        </Link>
-      </main>
-      <Footer />
-    </>
+    <main className="mx-auto flex max-w-[880px] flex-col gap-6 px-5 pb-20 pt-16 text-center">
+      <div className="text-[56px] leading-none">{c.icon}</div>
+      <h1 className="m-0 text-display-m text-[--color-ink]">{c.title}</h1>
+      <p className="mx-auto max-w-[52ch] text-body text-[--color-ink-mute]">{c.tagline}</p>
+      <p className="text-mono-s text-[--color-ink-faint]">{c.hint}</p>
+      <Link
+        href="/"
+        className="mx-auto mt-4 text-mono-s text-[--color-signal] underline decoration-transparent underline-offset-4 hover:decoration-[--color-signal]"
+      >
+        ← back to gallery
+      </Link>
+    </main>
   );
 }
 

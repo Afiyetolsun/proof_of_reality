@@ -77,14 +77,14 @@ export function ProofScene({ url, attestor, mode }: Props) {
     return (
       <div
         aria-hidden
-        className="aspect-[16/10] w-full border border-[--color-rule] bg-[--color-surface-sunk]"
+        className="aspect-[16/10] w-full rounded-[20px] border border-[--color-rule] bg-[--color-surface-sunk]"
       />
     );
   }
 
   if (error) {
     return (
-      <div className="border border-[--color-rule] bg-[--color-surface-raised] px-6 py-10 text-center">
+      <div className="rounded-[20px] border border-[--color-rule] bg-[--color-surface-raised] px-6 py-10 text-center">
         <div className="text-eyebrow font-mono text-[--color-warn]">scene unavailable</div>
         <p className="mt-2 text-mono-s text-[--color-ink-mute]">{error}</p>
         <a
@@ -185,7 +185,7 @@ function GlbCard({
   }, [url, isRoom]);
 
   return (
-    <div className="border border-[--color-rule] bg-[--color-surface-raised] p-2">
+    <div className="overflow-hidden rounded-[20px] border border-[--color-rule] bg-[--color-surface-raised] p-2">
       <Script type="module" src="/model-viewer.min.js" strategy="lazyOnload" />
       {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
       <model-viewer
@@ -221,6 +221,7 @@ function GlbCard({
             width: "100%",
             height: "min(60vh, 520px)",
             background: "oklch(0.13 0.012 250)",
+            borderRadius: "16px",
           },
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } as any)}
@@ -241,7 +242,7 @@ function UsdzCard({ url, attestor }: { url: string; attestor?: string }) {
     /iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent);
 
   return (
-    <div className="border border-[--color-rule] bg-[--color-surface-raised] p-10 text-center">
+    <div className="rounded-[20px] border border-[--color-rule] bg-[--color-surface-raised] p-10 text-center">
       <div
         aria-hidden
         className="mx-auto mb-4 text-[44px] leading-none"
