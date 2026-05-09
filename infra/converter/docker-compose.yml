@@ -1,0 +1,25 @@
+services:
+  converter:
+    build: .
+    container_name: po-converter
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      # Inside the docker network, the Bee container is reachable via the
+      # external network or via host. On the VPS where Bee runs in its own
+      # docker-compose stack, use the host bridge so we can reach
+      # localhost:1633 on the host.
+      BEE_URL: "${BEE_URL:-http://host.docker.internal:1633}"
+      STAMP_ID: "${STAMP_ID:?set STAMP_ID in .env (your Bee postage batch)}"
+      CACHE_FILE: "/data/cache.json"
+    volumes:
+      - converter-cache:/data
+    extra_hosts:
+      # Make `host.docker.internal` resolve on Linux too, so we can reach
+      # the Bee node running in the sibling docker-compose stack.
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  converter-cache:
+    name: po-converter-cache

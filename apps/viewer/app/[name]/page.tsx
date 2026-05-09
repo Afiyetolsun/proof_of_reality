@@ -18,6 +18,7 @@
  */
 import Link from "next/link";
 import { resolveEnsName, contentUrl, directContentUrl, normalizeName } from "@/lib/ens";
+import { maybeConvertScene } from "@/lib/converter";
 import { LandingSearch } from "../LandingSearch";
 import { getProof } from "@/lib/chain";
 import { runVerification } from "@/lib/verify";
@@ -45,7 +46,12 @@ export default async function NamePage({ params }: PageProps) {
     );
   }
 
-  const record = res.record;
+  // If the contenthash points at a USDZ on Swarm, the converter
+  // service rewrites it to the GLB version (cached on the VPS) so
+  // model-viewer can render it in-canvas. Silent no-op when the
+  // converter isn't reachable, scene is already GLB, or the format
+  // can't be detected — UsdzCard fallback still works.
+  const record = await maybeConvertScene(res.record);
 
   // On-chain proof — only fetch if we have a tokenId. Some records may
   // be partially populated during the ~25s window between mint and
