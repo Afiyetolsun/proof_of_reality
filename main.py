@@ -772,8 +772,15 @@ def make_app(args, mgr, backend: BackendClient | None):
             up = backend.upload_or_local(bundle_bytes, artifact_path)
             envelope["backend"]["upload"] = up
             swarm_ref = up["swarmRef"]
-            bundle_ref = (up.get("bundleRef")
-                          or f"local:{bundle_hash[2:]}")
+            # Always send bundleRef as `local:<bundleHash>` rather than
+            # the backend's bundle pin reference. The /api/upload route
+            # pins the bundle.json to Swarm as a side-effect of producing
+            # cosmoSig, but that pin is not the canonical bundle URL —
+            # the bundle is identified on-chain by its hash, and the ENS
+            # contenthash should resolve to the scene file (which the
+            # OAK uploads directly to Swarm), not to a redundant copy of
+            # the JSON manifest. Matches iOS ProofSubmitter behaviour.
+            bundle_ref = f"local:{bundle_hash[2:]}"
             cosmo_sig = up.get("cosmoSig")
 
             mint_resp = backend.mint(
@@ -896,7 +903,10 @@ def make_app(args, mgr, backend: BackendClient | None):
             up = backend.upload_or_local(bundle_bytes, artifact_path)
             mint_resp = backend.mint(
                 swarm_ref=up["swarmRef"],
-                bundle_ref=up.get("bundleRef") or f"local:{envelope['bundle_hash'][2:]}",
+                # Same rationale as the live-capture path: bundleRef is
+                # always local:<hash>; the /api/upload bundle pin is a
+                # side-effect we don't reference on-chain.
+                bundle_ref=f"local:{envelope['bundle_hash'][2:]}",
                 bundle_hash=envelope["bundle_hash"],
                 sat_sig=sat_sig,
                 cosmo_sig=up.get("cosmoSig"),
