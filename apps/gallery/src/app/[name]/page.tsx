@@ -15,7 +15,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { resolveEnsName, contentUrl, directContentUrl, normalizeName } from "@/lib/ens.js";
-import { getProof } from "@/lib/chain/index.js";
+import { getProof, ChainConfigMissingError } from "@/lib/chain/index.js";
 import { runVerification } from "@/lib/verify/index.js";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
@@ -44,12 +44,17 @@ export default async function NamePage({ params }: PageProps) {
 
   let onchain: Awaited<ReturnType<typeof getProof>> | null = null;
   let checks: Awaited<ReturnType<typeof runVerification>> = [];
+  let chainConfigMissing = false;
   if (record.tokenId !== null) {
     try {
       onchain = await getProof(record.tokenId);
       checks = await runVerification(onchain);
     } catch (e) {
-      console.warn("[gallery] on-chain fetch failed:", (e as Error).message);
+      if (e instanceof ChainConfigMissingError) {
+        chainConfigMissing = true;
+      } else {
+        console.warn("[gallery] on-chain fetch failed:", (e as Error).message);
+      }
     }
   }
   void onchain;
@@ -100,7 +105,13 @@ export default async function NamePage({ params }: PageProps) {
                   on-chain side to finalize). Refresh in a moment.
                 </p>
               )}
-              {checks.length === 0 && record.tokenId !== null && (
+              {checks.length === 0 && record.tokenId !== null && chainConfigMissing && (
+                <p className="text-body-s text-[--color-ink-mute]">
+                  On-chain witness verification is offline (deployment env vars unset). The
+                  ENS records below still prove the mint happened.
+                </p>
+              )}
+              {checks.length === 0 && record.tokenId !== null && !chainConfigMissing && (
                 <p className="text-body-s text-[--color-ink-mute]">
                   Couldn&apos;t fetch on-chain proof — see browser console.
                 </p>
