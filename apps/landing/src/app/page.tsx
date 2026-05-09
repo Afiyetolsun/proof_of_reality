@@ -8,7 +8,7 @@ import { RealVsFake } from "../components/RealVsFake";
 import { WitnessDiagram } from "../components/WitnessDiagram";
 import { FlowDiagram } from "../components/FlowDiagram";
 import { Footer } from "../components/Footer";
-import { architectureUrl, hasSampleToken, viewerSample, githubUrl } from "../lib/viewer-link";
+import { architectureUrl, viewerHome, githubUrl, ensAppParentUrl, ensParentName } from "../lib/viewer-link";
 
 export default function Page() {
   return (
@@ -47,8 +47,8 @@ function Hero() {
           proof. Not generatable by AI, not pre-recordable, not forgeable on the ground.
         </p>
         <div className="mt-10 flex flex-wrap items-center gap-x-8 gap-y-4">
-          <CTAButton href={hasSampleToken ? viewerSample : viewerSample} external>
-            Verify a sample proof
+          <CTAButton href={viewerHome} external>
+            Open the verifier
           </CTAButton>
           <CTAButton href={architectureUrl} variant="ghost" external>
             Architecture
@@ -192,7 +192,7 @@ function Demo() {
           </dl>
 
           <div className="mt-8">
-            <CTAButton href={viewerSample} external>
+            <CTAButton href={viewerHome} external>
               Verify it yourself
             </CTAButton>
           </div>
@@ -276,19 +276,16 @@ function BuildWithUs() {
       eyebrow: "MARKETPLACES",
       title: "Verified listings as a primitive.",
       copy: "Every listing carries a Reality NFT. The lemons sort themselves out.",
-      contact: "marketplaces@proof-of-reality.xyz",
     },
     {
       eyebrow: "RWA · DEFI",
       title: "Tokens that prove their underlying.",
       copy: "Mint against a verifiable 3D snapshot, not a PDF and a promise.",
-      contact: "rwa@proof-of-reality.xyz",
     },
     {
       eyebrow: "DEPIN · ORACLES",
       title: "An oracle for the physical world.",
       copy: "Smart contracts that need to know an object exists can ask, and trust the answer.",
-      contact: "oracles@proof-of-reality.xyz",
     },
   ];
   return (
@@ -299,12 +296,6 @@ function BuildWithUs() {
             <div className="text-mono-s text-[--color-signal]">{a.eyebrow}</div>
             <h3 className="mt-4 text-h2 text-[--color-ink]">{a.title}</h3>
             <p className="mt-4 max-read text-body-s text-[--color-ink-mute]">{a.copy}</p>
-            <a
-              href={`mailto:${a.contact}`}
-              className="mt-6 inline-block text-mono-s text-[--color-ink] underline decoration-[--color-signal] underline-offset-4 hover:text-[--color-signal]"
-            >
-              {a.contact}
-            </a>
           </article>
         ))}
       </div>
@@ -315,11 +306,29 @@ function BuildWithUs() {
         </div>
         <div className="md:col-span-8">
           <p className="text-display-m text-[--color-ink]">
-            We are at ETHPrague. The viewer is open. The contract is on Base Sepolia. Open the proof.
+            We are at ETHPrague. The verifier is open at{" "}
+            <a
+              href={viewerHome}
+              target="_blank"
+              rel="noreferrer"
+              className="text-[--color-signal] underline decoration-[--color-signal] underline-offset-4 hover:decoration-2"
+            >
+              app.realityproof.app
+            </a>
+            . Every mint resolves under{" "}
+            <a
+              href={ensAppParentUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="text-[--color-signal] underline decoration-[--color-signal] underline-offset-4 hover:decoration-2"
+            >
+              {ensParentName}
+            </a>
+            . Open the proof.
           </p>
           <div className="mt-8 flex flex-wrap items-center gap-x-8 gap-y-4">
-            <CTAButton href={viewerSample} external>
-              Verify a sample proof
+            <CTAButton href={viewerHome} external>
+              Open the verifier
             </CTAButton>
             <CTAButton href={githubUrl} variant="ghost" external>
               Read the source

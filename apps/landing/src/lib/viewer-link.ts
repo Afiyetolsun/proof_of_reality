@@ -1,12 +1,18 @@
-const VIEWER_BASE = process.env.NEXT_PUBLIC_VIEWER_BASE_URL ?? "http://localhost:3000";
-const SAMPLE_TOKEN = process.env.NEXT_PUBLIC_SAMPLE_TOKEN_ID;
-const GITHUB = process.env.NEXT_PUBLIC_GITHUB_URL ?? "https://github.com";
+// Public URLs for the production deployment. Each can be overridden via
+// NEXT_PUBLIC_* env vars (see .env.example) for previews / local dev.
+
+const VIEWER_BASE =
+  process.env.NEXT_PUBLIC_VIEWER_BASE_URL ?? "https://app.realityproof.app";
+const GITHUB =
+  process.env.NEXT_PUBLIC_GITHUB_URL ?? "https://github.com/Afiyetolsun/proof_of_reality";
+const ENS_APP_BASE =
+  process.env.NEXT_PUBLIC_ENS_APP_BASE_URL ?? "https://sepolia.app.ens.domains";
+const ENS_PARENT = process.env.NEXT_PUBLIC_ENS_PARENT_NAME ?? "realityproof.eth";
 
 export const viewerHome = VIEWER_BASE;
-export const viewerSample = SAMPLE_TOKEN
-  ? `${VIEWER_BASE}/token/${SAMPLE_TOKEN}`
-  : VIEWER_BASE;
 export const githubUrl = GITHUB;
 export const architectureUrl = `${GITHUB}/blob/main/docs/architecture.md`;
 export const trustModelUrl = `${GITHUB}/blob/main/docs/trust-model.md`;
-export const hasSampleToken = Boolean(SAMPLE_TOKEN);
+export const basescanUrl = "https://sepolia.basescan.org";
+export const ensParentName = ENS_PARENT;
+export const ensAppParentUrl = `${ENS_APP_BASE}/${ENS_PARENT}?tab=subnames`;

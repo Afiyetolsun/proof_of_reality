@@ -1,5 +1,13 @@
 import { Eyebrow } from "./Eyebrow";
-import { architectureUrl, githubUrl, trustModelUrl, viewerHome } from "../lib/viewer-link";
+import {
+  architectureUrl,
+  basescanUrl,
+  ensAppParentUrl,
+  ensParentName,
+  githubUrl,
+  trustModelUrl,
+  viewerHome,
+} from "../lib/viewer-link";
 
 export function Footer() {
   return (
@@ -19,8 +27,9 @@ export function Footer() {
         ]} />
 
         <FooterCol title="Verifier" links={[
-          ["Open viewer", viewerHome, true],
-          ["Base Sepolia", "https://sepolia.basescan.org", true],
+          ["Open gallery", viewerHome, true],
+          [`${ensParentName} on ENS`, ensAppParentUrl, true],
+          ["Base Sepolia", basescanUrl, true],
         ]} />
 
         <FooterCol title="Built with" links={[
@@ -35,7 +44,7 @@ export function Footer() {
           © {new Date().getFullYear()} · proof of reality · hackathon scaffold
         </span>
         <span className="text-mono-s text-[--color-ink-mute]">
-          v0.1 · base-sepolia · contract pending
+          v0.1 · base-sepolia · live
         </span>
       </div>
     </footer>

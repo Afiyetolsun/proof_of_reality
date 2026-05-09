@@ -7,12 +7,12 @@ export const metadata: Metadata = {
   title: "Proof of Reality — Web3 oracle for the physical world",
   description:
     "Cryptographic proof that an object exists in physical space, here, now. Five independent witnesses on every scan: cosmic nonce, KMS co-signature, hardware-resident device key, Swarm content addressing, App Attest.",
-  metadataBase: new URL("https://proof-of-reality.xyz"),
+  metadataBase: new URL("https://realityproof.app"),
   openGraph: {
     title: "Proof of Reality",
     description:
       "Five witnesses on every scan. Not generatable by AI, not pre-recordable, not forgeable on the ground.",
-    url: "https://proof-of-reality.xyz",
+    url: "https://realityproof.app",
     siteName: "Proof of Reality",
     type: "website",
     images: [
