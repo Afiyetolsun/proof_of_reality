@@ -4,7 +4,10 @@ services:
     container_name: po-converter
     restart: unless-stopped
     ports:
-      - "8080:8080"
+      # Host-side port is overridable via PORT in .env (default 8082).
+      # The container always listens on 8082 internally — only the host
+      # mapping changes if you set PORT.
+      - "${PORT:-8082}:8082"
     environment:
       # Inside the docker network, the Bee container is reachable via the
       # external network or via host. On the VPS where Bee runs in its own
@@ -13,6 +16,7 @@ services:
       BEE_URL: "${BEE_URL:-http://host.docker.internal:1633}"
       STAMP_ID: "${STAMP_ID:?set STAMP_ID in .env (your Bee postage batch)}"
       CACHE_FILE: "/data/cache.json"
+      PORT: "8082"
     volumes:
       - converter-cache:/data
     extra_hosts:

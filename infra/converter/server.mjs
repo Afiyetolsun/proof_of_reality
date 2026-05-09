@@ -25,7 +25,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 
-const PORT = Number(process.env.PORT ?? 8080);
+const PORT = Number(process.env.PORT ?? 8082);
 const BEE_URL = (process.env.BEE_URL ?? "http://localhost:1633").replace(/\/$/, "");
 const STAMP_ID = process.env.STAMP_ID;
 const CACHE_FILE = process.env.CACHE_FILE ?? "/data/cache.json";

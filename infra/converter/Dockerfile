@@ -42,7 +42,7 @@ COPY server.mjs convert.py ./
 RUN mkdir -p /data && chmod 777 /data
 VOLUME ["/data"]
 
-EXPOSE 8080
+EXPOSE 8082
 
 # Headless Blender needs no display; the script we feed it does
 # `bpy.ops.import_scene.usd(...)` followed by `bpy.ops.export_scene.gltf(...)`.
