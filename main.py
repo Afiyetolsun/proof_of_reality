@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 import os
+import secrets
 import threading
 import time
 import uuid
@@ -32,6 +33,40 @@ SCANS_DIR.mkdir(exist_ok=True)
 MINT_MODE_BY_CAPTURE = {"photo": 1, "cloud": 1, "video": 2}
 BUNDLE_MODE_BY_CAPTURE = {"photo": "objectCapture", "cloud": "objectCapture",
                           "video": "spatial"}
+
+
+def _local_nonce() -> str:
+    """Cryptographically random 32-byte nonce used when the backend is
+    unreachable ('Space Mode'). The bundle still has a `nonce` field for
+    canonical hashing; it's just not cosmically derived."""
+    return "0x" + secrets.token_hex(32)
+
+
+def _compute_tier(nonce_source: str, has_attestation: bool) -> dict:
+    """Classify a scan by its proof-of-reality witnesses.
+
+    nonce_source ∈ {satellite, trng-derived, local}
+    has_attestation: True iff the USB Armory signed the bundle hash.
+
+    Tier label is shown in the UI and stored on the envelope so a verifier
+    can immediately tell what guarantees a given scan provides."""
+    if nonce_source == "satellite":
+        label = "cosmic+token" if has_attestation else "cosmic"
+    elif nonce_source == "trng-derived":
+        label = "online+token" if has_attestation else "online"
+    else:
+        label = "space+token" if has_attestation else "space"
+    return {
+        "label": label,
+        "nonce_source": nonce_source,
+        "attestation": "armory" if has_attestation else "none",
+    }
+
+
+def _classify_nonce(nonce_resp: dict | None) -> str:
+    if not nonce_resp:
+        return "local"
+    return "satellite" if nonce_resp.get("satSig") else "trng-derived"
 
 
 def _env(name: str, default=None):
@@ -497,6 +532,17 @@ def make_app(args, mgr, backend: BackendClient | None):
     app.mount("/static", StaticFiles(directory=str(ROOT / "static")), name="static")
 
     def _finalize(snap, artifact_path, extra):
+        """Build the canonical bundle, sign it, and try to mint.
+
+        Tiered degradation:
+          - Backend reachable → cTRNG/satellite nonce; otherwise generate a
+            local urandom nonce (Space Mode).
+          - Armory plugged in → sign the bundle hash; otherwise mint with
+            attestation 'MOCK'.
+          - Backend reachable + nonce_resp present → upload + mint immediately.
+            Otherwise persist the bundle + Armory sig with mint_pending=true
+            so /retry-mint/<scan_id> can replay later.
+        """
         sha = _hash_file(artifact_path)
         capture_mode = snap['mode']
         envelope = {
@@ -514,33 +560,30 @@ def make_app(args, mgr, backend: BackendClient | None):
             "bundle_hash": None,
             "backend": None,
             "mint": None,
+            "tier": None,
+            "mint_pending": False,
             **extra,
         }
 
-        # Local-only path: no backend → sign the artifact hash directly,
-        # matching the historical envelope shape.
-        if backend is None or args.no_mint:
-            if not args.no_sign:
-                try:
-                    envelope['gotee'] = signer.sign(
-                        sha, host=args.gotee_host, port=args.gotee_port)
-                except signer.GoteeError as e:
-                    envelope['gotee'] = {"error": str(e)}
-            _write_envelope(envelope, snap['scan_id'])
-            return envelope
-
-        # Backend path: nonce → canonical bundle → sign bundle hash → upload → mint.
+        # Step 1: nonce. Try backend first; fall back to local urandom (Space Mode).
         nonce_resp = None
-        try:
-            nonce_resp = backend.get_nonce()
-            envelope["backend"] = {"nonce": nonce_resp}
-        except BackendError as e:
-            envelope["backend"] = {"nonce_error": str(e)}
+        if backend is not None and not args.no_mint:
+            try:
+                nonce_resp = backend.get_nonce()
+                envelope["backend"] = {"nonce": nonce_resp}
+            except BackendError as e:
+                envelope["backend"] = {"nonce_error": str(e)}
 
-        nonce_value = (nonce_resp or {}).get("nonce", "")
-        sat_sig = (nonce_resp or {}).get("satSig", "")
-        nonce_expires_at = int((nonce_resp or {}).get("expiresAt", snap['t_end']))
+        if nonce_resp is not None:
+            nonce_value = nonce_resp.get("nonce", "") or _local_nonce()
+            sat_sig = nonce_resp.get("satSig", "")
+            nonce_expires_at = int(nonce_resp.get("expiresAt", snap['t_end']))
+        else:
+            nonce_value = _local_nonce()
+            sat_sig = ""
+            nonce_expires_at = int(snap['t_end']) + 600
 
+        # Step 2: canonical bundle. Always built — same shape regardless of tier.
         intrinsics = (
             (mgr.K[0, 0], mgr.K[1, 1], mgr.K[0, 2], mgr.K[1, 2],
              float(mgr.W or 0), float(mgr.H or 0)) if mgr.K is not None else None
@@ -566,7 +609,9 @@ def make_app(args, mgr, backend: BackendClient | None):
         bundle_path = SCANS_DIR / f"{snap['scan_id']}.bundle.json"
         bundle_path.write_bytes(bundle_bytes)
 
+        # Step 3: sign with Armory if available.
         attestation_hex = ""
+        has_attestation = False
         if not args.no_sign:
             try:
                 gotee_env = signer.sign(
@@ -574,12 +619,18 @@ def make_app(args, mgr, backend: BackendClient | None):
                     host=args.gotee_host, port=args.gotee_port)
                 envelope["gotee"] = gotee_env
                 attestation_hex = signer.pack_attestation(gotee_env)
+                has_attestation = True
             except signer.GoteeError as e:
                 envelope["gotee"] = {"error": str(e)}
 
-        # Without a nonce we can't satisfy the canonical iOS shape, so don't
-        # mint — keep the local envelope (with bundle + gotee) for retry later.
-        if nonce_resp is None:
+        # Step 4: classify the achieved proof tier.
+        envelope["tier"] = _compute_tier(_classify_nonce(nonce_resp),
+                                         has_attestation)
+
+        # Step 5: mint if backend is reachable + we got a real nonce.
+        # Otherwise mark mint_pending so /retry-mint can replay later.
+        if backend is None or args.no_mint or nonce_resp is None:
+            envelope["mint_pending"] = backend is not None and not args.no_mint
             _write_envelope(envelope, snap['scan_id'])
             return envelope
 
@@ -605,8 +656,10 @@ def make_app(args, mgr, backend: BackendClient | None):
             envelope["mint"] = mint_resp
         except BackendError as e:
             envelope["backend"]["error"] = str(e)
+            envelope["mint_pending"] = True
         except Exception as e:
             envelope["backend"]["error"] = f"{type(e).__name__}: {e}"
+            envelope["mint_pending"] = True
 
         _write_envelope(envelope, snap['scan_id'])
         return envelope
@@ -640,13 +693,82 @@ def make_app(args, mgr, backend: BackendClient | None):
                 backend_msg = backend.base_url
             except BackendError as e:
                 backend_msg = str(e)
+        # Achievable tier *right now* — assumes a fresh nonce will succeed if
+        # the backend is up. Treats backend reachability as a proxy for
+        # eventual satellite signing; we won't know until we actually call
+        # /api/nonce whether satSig is populated, so we report the optimistic
+        # case ('cosmic') and let _classify_nonce downgrade per-scan.
+        nonce_source = "trng-derived" if backend_ok else "local"
+        # 'cosmic' is the optimistic upper bound when backend is up.
+        if backend_ok:
+            nonce_source = "satellite"
+        achievable = _compute_tier(nonce_source, connected)
         return {
             "token": {"connected": connected, "msg": msg,
                       "host": args.gotee_host, "port": args.gotee_port},
             "backend": {"ok": backend_ok, "msg": backend_msg,
                         "url": backend.base_url if backend else None},
+            "tier": achievable,
             "ready": connected and (backend_ok or backend is None),
         }
+
+    @app.post("/retry-mint/{scan_id}")
+    def retry_mint(scan_id: str):
+        """Replay a previously persisted bundle (typically from Space Mode)
+        through upload + mint when the backend comes back online. The
+        bundle bytes on disk are the canonical hash-source — we re-send
+        them verbatim, so the on-chain bundleHash matches what the
+        Armory already signed."""
+        if "/" in scan_id or ".." in scan_id:
+            raise HTTPException(400, "bad scan_id")
+        env_path = SCANS_DIR / f"{scan_id}.json"
+        bundle_path = SCANS_DIR / f"{scan_id}.bundle.json"
+        if not env_path.exists():
+            raise HTTPException(404, "envelope not found")
+        if not bundle_path.exists():
+            raise HTTPException(409, "bundle.json missing — scan was local-only")
+        if backend is None:
+            raise HTTPException(503, "backend not configured")
+        envelope = json.loads(env_path.read_text())
+        if envelope.get("mint", {}).get("txHash"):
+            return {"status": "already_minted", "mint": envelope["mint"]}
+
+        bundle_bytes = bundle_path.read_bytes()
+        artifact_path = SCANS_DIR / envelope["artifact"]
+        if not artifact_path.exists():
+            raise HTTPException(404, "scene artifact missing")
+
+        gotee = envelope.get("gotee") or {}
+        attestation_hex = (signer.pack_attestation(gotee)
+                           if "mac" in gotee else "MOCK")
+        bundle = envelope.get("bundle") or {}
+        sat_sig = bundle.get("satSig", "")
+        capture_mode = envelope.get("mode", "cloud")
+
+        try:
+            up = backend.upload_or_local(bundle_bytes, artifact_path)
+            mint_resp = backend.mint(
+                swarm_ref=up["swarmRef"],
+                bundle_ref=up.get("bundleRef") or f"local:{envelope['bundle_hash'][2:]}",
+                bundle_hash=envelope["bundle_hash"],
+                sat_sig=sat_sig,
+                cosmo_sig=up.get("cosmoSig"),
+                attestation=attestation_hex,
+                attestation_type=1,
+                captured_at=int(envelope["ts"]),
+                mode=MINT_MODE_BY_CAPTURE.get(capture_mode, 1),
+            )
+        except BackendError as e:
+            raise HTTPException(502, f"retry failed: {e}")
+
+        envelope["backend"] = (envelope.get("backend") or {})
+        envelope["backend"]["upload"] = up
+        envelope["mint"] = mint_resp
+        envelope["mint_pending"] = False
+        # Tier of a retried mint reflects what was *captured*, not what's now
+        # achievable — keep the original tier label; only the mint state changed.
+        env_path.write_text(json.dumps(envelope, indent=2))
+        return envelope
 
     @app.post("/capture/photo")
     def capture_photo():
