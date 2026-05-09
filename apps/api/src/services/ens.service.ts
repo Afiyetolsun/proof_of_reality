@@ -113,19 +113,64 @@ export function buildSubname(bundleHash: Hex): { label: string; full: string } {
 }
 
 /**
- * Encode an IPFS CID v0 as ENSIP-7 contenthash (multicodec 0xe301 + length + dag-pb cid).
- * For our use we just emit a minimal valid IPFS contenthash — enough to round-trip.
+ * ENSIP-7 contenthash. Detects the ref format and emits the canonical
+ * multicodec-prefixed bytes that ENS-aware clients (Brave, MetaMask,
+ * eth.link, ens.tools) recognise to resolve to the actual content.
+ *
+ *   Swarm ref (64 hex)   → 0xe40101fa011b20 + 32-byte hash    (swarm-ns)
+ *   IPFS CIDv0 (Qm…)     → 0xe301 + base58_decode(cid)        (ipfs-ns)
+ *   Anything else        → 0x  (no record)
+ *
+ * The Swarm prefix is constant: 0xe4 (swarm-ns) + 0x01 (varint=1) +
+ * 0xfa01 (swarm-manifest codec) + 0x1b (keccak-256 multihash code) +
+ * 0x20 (32-byte length). For CIDv0 the IPFS prefix 0xe301 sits in front
+ * of the base58-decoded multihash (which already encodes its own codec
+ * + length internally).
  */
-function encodeIpfsContenthash(cid: string): Hex {
-  if (!cid) return "0x";
-  // v0 CIDs (Qm…) are base58-decoded 34-byte multihashes. Easiest to just
-  // wrap with 0xe3010170 prefix + the base58-decoded bytes — but we don't
-  // want a base58 dep. For the hackathon we emit a minimal text-encoded
-  // contenthash with a URL prefix the resolver clients can recognise.
-  // Most ENS clients tolerate a UTF-8 multibase wrapper; production should
-  // base58-decode properly.
-  const utf = toHex(toBytes(`ipfs://${cid}`));
-  return utf;
+function encodeContenthash(ref: string): Hex {
+  if (!ref) return "0x";
+
+  // Swarm reference: 64-char hex (no prefix). Length 64 ± optional 0x.
+  const swarmHex = ref.replace(/^0x/, "").toLowerCase();
+  if (/^[0-9a-f]{64}$/.test(swarmHex)) {
+    return `0xe40101fa011b20${swarmHex}` as Hex;
+  }
+
+  // IPFS CIDv0 ("Qm…", 46 base58 chars). base58 decoded = 34 bytes,
+  // structured as 0x12 0x20 <32-byte-sha256>. ENSIP-7 prefix is
+  // 0xe30170: e3=ipfs-ns, 01=CIDv1, 70=dag-pb codec.
+  if (/^Qm[1-9A-HJ-NP-Za-km-z]{44}$/.test(ref)) {
+    const decoded = base58Decode(ref);
+    return ("0xe30170" + Array.from(decoded).map(b => b.toString(16).padStart(2, "0")).join("")) as Hex;
+  }
+
+  // Unknown / future format — leave empty rather than encoding garbage
+  // that ENS clients would render as a broken URL.
+  return "0x";
+}
+
+const BASE58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+
+/** Tiny base58 decoder — avoids pulling in a dep just for CIDv0 parsing. */
+function base58Decode(s: string): Uint8Array {
+  const bytes: number[] = [0];
+  for (const c of s) {
+    const v = BASE58_ALPHABET.indexOf(c);
+    if (v < 0) throw new Error(`invalid base58 char: ${c}`);
+    let carry = v;
+    for (let i = 0; i < bytes.length; i++) {
+      carry += (bytes[i] ?? 0) * 58;
+      bytes[i] = carry & 0xff;
+      carry >>= 8;
+    }
+    while (carry > 0) {
+      bytes.push(carry & 0xff);
+      carry >>= 8;
+    }
+  }
+  // Each leading "1" → leading 0 byte
+  for (let i = 0; i < s.length && s[i] === "1"; i++) bytes.push(0);
+  return Uint8Array.from(bytes.reverse());
 }
 
 /**
@@ -188,7 +233,10 @@ export async function publishToEns(input: EnsPublishInput): Promise<EnsPublishRe
         {
           attestor: input.attestor,
           bundleHash: input.bundleHash,
-          contenthash: encodeIpfsContenthash(input.bundleRefCid),
+          // Prefer the bundle JSON ref (canonical proof manifest); fall
+          // back to the scene ref so contenthash is at least non-empty
+          // for iOS mints that send bundleRef=local:<hash>.
+          contenthash: encodeContenthash(input.bundleRefCid || input.sceneCid),
           satSig: input.satSig,
           cosmoSig: input.cosmoSig,
           sceneCid: input.sceneCid,
