@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "next dev --port 3002",
-    "build": "next build",
+    "build": "pnpm --filter @proof-of-reality/contracts-abi --filter @proof-of-reality/proof-bundle --filter @proof-of-reality/attestation --filter @proof-of-reality/verified-swarm-fetch run build && next build",
     "start": "next start --port 3002",
     "typecheck": "tsc --noEmit",
     "lint": "next lint"
