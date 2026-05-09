@@ -1,5 +1,6 @@
 "use client";
 
+import Script from "next/script";
 import { useEffect, useState } from "react";
 
 interface Props {
@@ -102,6 +103,15 @@ export function ProofScene({ url, attestor }: Props) {
 function GlbCard({ url, attestor }: { url: string; attestor?: string }) {
   return (
     <section className="scene-card">
+      {/* Lazy-load model-viewer ONLY when we actually have a GLB to
+          render. USDZ pages don't load it (it can't render USDZ in
+          canvas anyway), saving ~400 KB of JS + sidestepping a stack
+          of model-viewer warnings/errors when no model is mounted. */}
+      <Script
+        type="module"
+        src="https://ajax.googleapis.com/ajax/libs/model-viewer/4.0.0/model-viewer.min.js"
+        strategy="lazyOnload"
+      />
       {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
       <model-viewer
         {...({

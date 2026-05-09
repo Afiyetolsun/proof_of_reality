@@ -91,7 +91,57 @@ export async function GET(req: Request) {
   );
 }
 
-// Same handler for HEAD so the ProofScene's pre-mount probe works.
+/**
+ * HEAD — same headers as GET, but **no body**. Critical: returning
+ * GET's body to a HEAD request makes the browser receive 4 MB of
+ * binary that some downstream layer (Next.js dev tooling, browser
+ * extension content scripts) tries to JSON.parse, yielding the
+ * notorious "Unexpected token 'P', \"PK..\" is not valid JSON"
+ * error in DevTools.
+ *
+ * We HEAD the upstream too so we get the same Content-Type +
+ * Content-Disposition without paying the bandwidth.
+ */
 export async function HEAD(req: Request) {
-  return GET(req);
+  const { searchParams } = new URL(req.url);
+  const ref = searchParams.get("ref")?.trim();
+  const proto = searchParams.get("proto");
+
+  if (!ref || (proto !== "bzz" && proto !== "ipfs")) {
+    return new NextResponse(null, { status: 400 });
+  }
+  if (proto === "bzz" && !HEX64.test(ref)) {
+    return new NextResponse(null, { status: 400 });
+  }
+  if (proto === "ipfs" && !CIDV0.test(ref)) {
+    return new NextResponse(null, { status: 400 });
+  }
+
+  const candidates: string[] = [];
+  if (proto === "bzz") {
+    if (BEE_LOCAL) candidates.push(`${BEE_LOCAL}/bzz/${ref}`);
+    candidates.push(`${SWARM_PUBLIC}/bzz/${ref}`);
+  } else {
+    candidates.push(`${IPFS_GATEWAY}/${ref}`);
+  }
+
+  for (const url of candidates) {
+    try {
+      const upstream = await fetch(url, { method: "HEAD", redirect: "follow" });
+      if (!upstream.ok) continue;
+      const headers = new Headers();
+      const ct = upstream.headers.get("content-type");
+      const cd = upstream.headers.get("content-disposition");
+      const cl = upstream.headers.get("content-length");
+      if (ct) headers.set("Content-Type", ct);
+      if (cd) headers.set("Content-Disposition", cd);
+      if (cl) headers.set("Content-Length", cl);
+      headers.set("Access-Control-Allow-Origin", "*");
+      headers.set("Cache-Control", "public, max-age=31536000, immutable");
+      return new NextResponse(null, { status: 200, headers });
+    } catch {
+      // try next candidate
+    }
+  }
+  return new NextResponse(null, { status: 502 });
 }

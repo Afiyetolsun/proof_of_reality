@@ -17,7 +17,6 @@
  * can independently verify the proof end-to-end.
  */
 import Link from "next/link";
-import Script from "next/script";
 import { resolveEnsName, contentUrl, directContentUrl, normalizeName } from "@/lib/ens";
 import { LandingSearch } from "../LandingSearch";
 import { getProof } from "@/lib/chain";
@@ -73,11 +72,6 @@ export default async function NamePage({ params }: PageProps) {
 
   return (
     <>
-      <Script
-        type="module"
-        src="https://ajax.googleapis.com/ajax/libs/model-viewer/4.0.0/model-viewer.min.js"
-        strategy="beforeInteractive"
-      />
       <main className="page">
         <header className="hero">
           <div className="hero-name">
