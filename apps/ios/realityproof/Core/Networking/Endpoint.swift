@@ -65,6 +65,35 @@ struct MintRequest: Encodable {
     let attestationType: Int   // 0 = appAttest, 1 = deviceSE
     let capturedAt: Int        // unix seconds
     let mode: Int              // 0 = roomPlan, 1 = objectCapture
+    /// User-chosen ENS label, lowercased + trimmed. Nil means: server
+    /// falls back to the default `vin-<bundleHash[2:14]>` handle.
+    let label: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case swarmRef, bundleRef, bundleHash, satSig, cosmoSig
+        case attestation, attestationType, capturedAt, mode, label
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(swarmRef, forKey: .swarmRef)
+        try c.encode(bundleRef, forKey: .bundleRef)
+        try c.encode(bundleHash, forKey: .bundleHash)
+        try c.encode(satSig, forKey: .satSig)
+        try c.encode(cosmoSig, forKey: .cosmoSig)
+        try c.encode(attestation, forKey: .attestation)
+        try c.encode(attestationType, forKey: .attestationType)
+        try c.encode(capturedAt, forKey: .capturedAt)
+        try c.encode(mode, forKey: .mode)
+        // Empty / whitespace label collapses to nil — never an empty string
+        // on the wire. Backend treats absent label as "use default".
+        if let raw = label {
+            let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty {
+                try c.encode(trimmed, forKey: .label)
+            }
+        }
+    }
 }
 
 struct MintResponse: Decodable {

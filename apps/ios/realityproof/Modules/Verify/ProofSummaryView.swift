@@ -24,10 +24,66 @@ struct ProofSummaryView: View {
 
     @StateObject private var submitter = ProofSubmitter()
     @State private var preview: PreviewMode?
+    @State private var labelInput: String = ""
 
     private enum PreviewMode: Identifiable {
         case threeD, ar
         var id: Int { hashValue }
+    }
+
+    /// Result of validating the user-typed ENS label against ENSIP-15-ish
+    /// rules the backend enforces. `valid` covers empty (server uses
+    /// default vin-...) and well-formed labels alike. `error` is set only
+    /// when the user has typed something the server would reject.
+    private struct LabelValidation {
+        let valid: Bool
+        let error: String?
+    }
+
+    private var trimmedLabel: String {
+        labelInput.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+
+    /// Client-side mirror of the backend rules. Server re-validates and
+    /// may also append a `-<bundleHash[2:8]>` suffix on collision, so the
+    /// final ensName comes from MintResponse — never re-derived here.
+    private var labelValidation: LabelValidation {
+        let raw = trimmedLabel
+        if raw.isEmpty {
+            return LabelValidation(valid: true, error: nil)
+        }
+        if raw.count < 3 || raw.count > 32 {
+            return LabelValidation(valid: false, error: "must be 3–32 chars")
+        }
+        let allowed = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyz0123456789-")
+        if raw.unicodeScalars.contains(where: { !allowed.contains($0) }) {
+            return LabelValidation(valid: false,
+                                   error: "only lowercase letters, digits, hyphens")
+        }
+        if raw.hasPrefix("-") || raw.hasSuffix("-") {
+            return LabelValidation(valid: false,
+                                   error: "must start and end with a letter or digit")
+        }
+        if raw.contains("--") {
+            return LabelValidation(valid: false, error: "no consecutive hyphens")
+        }
+        return LabelValidation(valid: true, error: nil)
+    }
+
+    /// What the resolved subname will look like — purely a preview. The
+    /// backend may disambiguate on collision (server appends a short
+    /// suffix), so this is best-effort, not the source of truth.
+    private var labelPreview: String {
+        let raw = trimmedLabel
+        if !raw.isEmpty {
+            return "\(raw).realityproof.eth"
+        }
+        // Default mirrors the backend fallback: vin-<bundleHash[2:14]>
+        let hash = payload.hash
+        let prefixIndex = hash.index(hash.startIndex, offsetBy: 2, limitedBy: hash.endIndex) ?? hash.startIndex
+        let endIndex = hash.index(prefixIndex, offsetBy: 12, limitedBy: hash.endIndex) ?? hash.endIndex
+        let slice = hash[prefixIndex..<endIndex]
+        return "vin-\(slice).realityproof.eth"
     }
 
     var body: some View {
@@ -98,6 +154,13 @@ struct ProofSummaryView: View {
                     failedCard(message: msg)
                 }
 
+                // Hide the picker once we have a mint — the ensName on the
+                // record is now the source of truth and editing the field
+                // would just be misleading.
+                if !isMinted {
+                    labelPickerSection
+                }
+
                 buttonRow
             }
             .padding(20)
@@ -158,6 +221,50 @@ struct ProofSummaryView: View {
         return all
     }
 
+    private var isMinted: Bool {
+        if case .done = submitter.phase { return true }
+        return false
+    }
+
+    /// User-pickable ENS label. Empty input is fine — backend uses the
+    /// default vin-... handle. Validation runs live; an invalid label
+    /// disables Submit (handled in buttonRow).
+    private var labelPickerSection: some View {
+        let validation = labelValidation
+        return VStack(alignment: .leading, spacing: 8) {
+            Text("ENS HANDLE (OPTIONAL)")
+                .font(.caption.bold())
+                .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 8) {
+                TextField("e.g. my-apartment-prague", text: $labelInput)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled(true)
+                    .keyboardType(.asciiCapable)
+                    .font(.body.monospaced())
+                    .padding(.vertical, 6)
+                Divider()
+                HStack(spacing: 6) {
+                    Image(systemName: "globe")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text(labelPreview)
+                        .font(.footnote.monospaced())
+                        .foregroundStyle(validation.valid ? .secondary : Color.red.opacity(0.8))
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+                if let err = validation.error {
+                    Text(err)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
+        }
+    }
+
     private var header: some View {
         VStack(spacing: 8) {
             Image(systemName: "checkmark.seal.fill")
@@ -208,38 +315,59 @@ struct ProofSummaryView: View {
     private func mintResultCard(record: MintRecord) -> some View {
         let isStub = record.stub == true
         let title = isStub ? "Mint stubbed" : "Minted on Base Sepolia"
-        let icon = isStub ? "exclamationmark.shield.fill" : "shield.lefthalf.filled"
         let tint: Color = isStub ? .orange : .green
+        let hasENS = (record.ensName?.isEmpty == false)
 
-        return VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Image(systemName: icon).foregroundStyle(tint)
-                Text(title).font(.headline)
-            }
-            keyValue("Tx", record.txHash.prefix(10) + "…" + record.txHash.suffix(8))
-            keyValue("Token", "#\(record.tokenId)")
+        return VStack(alignment: .center, spacing: 14) {
+            // 1. Big check icon and headline (ENS-first layout). When the
+            // mint is stubbed or ENS publishing failed we drop back to
+            // the older Tx-headline layout.
+            Image(systemName: isStub ? "exclamationmark.shield.fill" : "checkmark.seal.fill")
+                .font(.system(size: 48))
+                .foregroundStyle(tint)
 
-            // ENS handle — the canonical, shareable identifier for this proof.
-            // Renders the name in monospace + a copy button so it reads as a
-            // resolvable address rather than a label.
+            Text(title)
+                .font(.headline)
+
+            // 2. Big prominent ENS block — monospaced .title3, with a
+            // copy button. This is the new primary identifier.
             if let name = record.ensName, !name.isEmpty {
-                ensRow(name: name)
+                prominentENSBlock(name: name, tint: tint)
             }
 
-            if let url = record.explorerURL {
-                HStack(spacing: 8) {
-                    Link(destination: url) {
-                        Label("Basescan", systemImage: "arrow.up.right.square")
-                            .font(.subheadline.bold())
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 8)
-                    }
-                    .buttonStyle(.bordered)
-                    .tint(tint)
+            // 3. Smaller, dimmed metadata rows beneath the headline.
+            VStack(spacing: 4) {
+                Text("Token #\(record.tokenId)")
+                    .font(.caption.monospaced())
+                    .foregroundStyle(.secondary)
+                Text("Tx \(record.txHash.prefix(10))…\(record.txHash.suffix(8))")
+                    .font(.caption.monospaced())
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+                Text("Minted \(formatMintedAt(record.mintedAt))")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.top, 2)
 
-                    if let ens = record.ensURL {
-                        Link(destination: ens) {
+            // 4. Action row — ENS first (primary, prominent), Basescan
+            // second (secondary). Share lives in the parent buttonRow
+            // and stays untouched.
+            if hasENS || record.explorerURL != nil {
+                HStack(spacing: 8) {
+                    if let ensURL = record.ensURL {
+                        Link(destination: ensURL) {
                             Label("ENS", systemImage: "globe")
+                                .font(.subheadline.bold())
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 8)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(.green)
+                    }
+                    if let explorerURL = record.explorerURL {
+                        Link(destination: explorerURL) {
+                            Label("Basescan", systemImage: "arrow.up.right.square")
                                 .font(.subheadline.bold())
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 8)
@@ -256,36 +384,50 @@ struct ProofSummaryView: View {
                     .padding(.top, 4)
             }
         }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity)
+        .padding(18)
         .background(tint.opacity(0.12),
                     in: RoundedRectangle(cornerRadius: 14))
     }
 
-    /// Two-line ENS row: small label then the subname in monospace, plus a
-    /// copy button. Tap-and-hold also works via .textSelection(.enabled).
-    private func ensRow(name: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("ENS HANDLE")
-                .font(.caption2.bold())
-                .foregroundStyle(.secondary)
-            HStack(alignment: .center, spacing: 8) {
+    /// Big monospaced ENS subname with a copy button. This is the
+    /// canonical identifier the user sees first on the success card.
+    private func prominentENSBlock(name: String, tint: Color) -> some View {
+        VStack(spacing: 6) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(name)
-                    .font(.footnote.monospaced())
+                    .font(.title3.monospaced().bold())
                     .lineLimit(1)
+                    .minimumScaleFactor(0.6)
                     .truncationMode(.middle)
                     .textSelection(.enabled)
                 Button {
                     UIPasteboard.general.string = name
                 } label: {
                     Image(systemName: "doc.on.doc")
-                        .font(.footnote)
+                        .font(.subheadline)
                 }
                 .buttonStyle(.borderless)
                 .accessibilityLabel("Copy ENS handle")
             }
+            Text("ENS handle")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .textCase(.uppercase)
         }
-        .padding(.vertical, 2)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 8)
+        .padding(.horizontal, 12)
+        .background(tint.opacity(0.14),
+                    in: RoundedRectangle(cornerRadius: 10))
+    }
+
+    private func formatMintedAt(_ ts: TimeInterval) -> String {
+        let date = Date(timeIntervalSince1970: ts)
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter.string(from: date)
     }
 
     private func failedCard(message: String) -> some View {
@@ -308,13 +450,18 @@ struct ProofSummaryView: View {
             switch submitter.phase {
             case .idle, .failed:
                 Button {
-                    Task { await submitter.submit(payload: payload) }
+                    let trimmed = trimmedLabel
+                    let labelToSend: String? = trimmed.isEmpty ? nil : trimmed
+                    Task {
+                        await submitter.submit(payload: payload, label: labelToSend)
+                    }
                 } label: {
                     Label("Submit Proof", systemImage: "paperplane.fill")
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 12)
                 }
                 .buttonStyle(.borderedProminent)
+                .disabled(!labelValidation.valid)
 
             case .uploading:
                 statusRow("Uploading bundle…")
@@ -325,6 +472,13 @@ struct ProofSummaryView: View {
             }
 
             Menu {
+                // ENS link goes first when we have one — it's the canonical
+                // identifier for this proof, what verifiers actually need.
+                if case .done(let record) = submitter.phase, let ensURL = record.ensURL {
+                    ShareLink(item: ensURL) {
+                        Label("ENS link", systemImage: "globe")
+                    }
+                }
                 ShareLink(item: sceneURL) {
                     Label("3D scene (.usdz)", systemImage: "cube.transparent")
                 }

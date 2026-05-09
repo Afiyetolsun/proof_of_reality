@@ -55,7 +55,7 @@ final class ProofSubmitter: ObservableObject {
         phase = .done(mint)
     }
 
-    func submit(payload: ProofSummaryPayload) async {
+    func submit(payload: ProofSummaryPayload, label: String? = nil) async {
         do {
             let resolved = try await resolveUpload(payload: payload)
 
@@ -70,7 +70,8 @@ final class ProofSubmitter: ObservableObject {
                 attestation: assertionString,
                 attestationType: 0,
                 capturedAt: Int(payload.bundle.createdAt),
-                mode: payload.mode.contractValue
+                mode: payload.mode.contractValue,
+                label: label
             )))
 
             let record = MintRecord(
