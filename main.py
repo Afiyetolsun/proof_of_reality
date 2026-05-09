@@ -209,7 +209,12 @@ class CaptureManager:
                 't_end': time.time(),
             }
             if mode == 'cloud':
-                payload['pcd'] = self.tsdf.extract_point_cloud() if self.tsdf else None
+                if self.tsdf:
+                    payload['pcd'] = self.tsdf.extract_point_cloud()
+                    payload['mesh'] = self.tsdf.extract_triangle_mesh()
+                else:
+                    payload['pcd'] = None
+                    payload['mesh'] = None
                 payload['updates'] = self.cloud_updates
             elif mode == 'video':
                 payload['frames'] = self.video_frames
@@ -353,8 +358,42 @@ def write_photo(scan_id, pts, cols):
     return path, {'point_count': int(n), 'artifact': path.name}
 
 
-def write_cloud(scan_id, pcd):
-    path = SCANS_DIR / f"{scan_id}.ply"
+def _clean_mesh(mesh):
+    """Sanitise a TSDF-extracted triangle mesh for "best quality" output.
+
+    Order matters: dedup first so the manifold and floating-fragment
+    passes operate on the smallest valid mesh.
+    """
+    mesh.remove_duplicated_vertices()
+    mesh.remove_duplicated_triangles()
+    mesh.remove_degenerate_triangles()
+    mesh.remove_unreferenced_vertices()
+    mesh.remove_non_manifold_edges()
+
+    # Drop floating fragments: cluster connected triangles, keep only
+    # the largest. This is the mesh-side analogue of DBSCAN on points;
+    # catches the orphan surfaces TSDF emits around depth-discontinuity
+    # edges and any leftover ghost geometry from pose slips.
+    if len(mesh.triangles) > 0:
+        clusters, n_per, _ = mesh.cluster_connected_triangles()
+        if len(n_per) > 0:
+            largest = int(np.argmax(n_per))
+            drop = np.asarray(clusters) != largest
+            mesh.remove_triangles_by_mask(drop)
+            mesh.remove_unreferenced_vertices()
+
+    # One iteration of Taubin smoothing. Volume-preserving (unlike
+    # Laplacian) so it doesn't shrink the model; lightly smooths the
+    # marching-cubes stair-step without rounding off real corners.
+    if len(mesh.triangles) > 0:
+        mesh = mesh.filter_smooth_taubin(number_of_iterations=1)
+
+    mesh.compute_vertex_normals()
+    return mesh
+
+
+def write_cloud(scan_id, pcd, mesh):
+    pcd_path = SCANS_DIR / f"{scan_id}.ply"
     # Strip statistical outliers before writing: Open3D's TSDF emits
     # isolated points around depth-discontinuity edges and on
     # uncertain pixels. nb_neighbors=20 / std_ratio=2.0 is a
@@ -364,9 +403,27 @@ def write_cloud(scan_id, pcd):
     if raw > 50:
         pcd, _ = pcd.remove_statistical_outlier(nb_neighbors=20, std_ratio=2.0)
     kept = int(len(pcd.points))
-    o3d.io.write_point_cloud(str(path), pcd, write_ascii=False, compressed=False)
-    return path, {'point_count': kept, 'point_count_raw': raw,
-                  'outliers_dropped': raw - kept, 'artifact': path.name}
+    o3d.io.write_point_cloud(str(pcd_path), pcd, write_ascii=False, compressed=False)
+
+    extra = {'point_count': kept, 'point_count_raw': raw,
+             'outliers_dropped': raw - kept, 'artifact': pcd_path.name}
+
+    # Mesh is extracted from the same TSDF volume, so it's effectively
+    # free given we already paid for the integration. Keep both as
+    # separate artifacts; the .ply is the signed primary, the .mesh.ply
+    # is a sibling whose own SHA goes into the envelope so downstream
+    # consumers can verify it independently.
+    if mesh is not None and len(mesh.triangles) > 0:
+        mesh = _clean_mesh(mesh)
+        if len(mesh.triangles) > 0:
+            mesh_path = SCANS_DIR / f"{scan_id}.mesh.ply"
+            o3d.io.write_triangle_mesh(str(mesh_path), mesh, write_ascii=False)
+            extra['mesh_artifact'] = mesh_path.name
+            extra['mesh_sha256'] = _hash_file(mesh_path)
+            extra['vertex_count'] = int(len(mesh.vertices))
+            extra['triangle_count'] = int(len(mesh.triangles))
+
+    return pcd_path, extra
 
 
 def write_video(scan_id, frames, K, w, h, fps):
@@ -477,7 +534,7 @@ def make_app(args, mgr):
             if snap.get('updates', 0) == 0 or pcd is None or len(pcd.points) == 0:
                 raise HTTPException(400, "TSDF integrated no frames — "
                                          "VIO may not have converged. Move slower.")
-            path, extra = write_cloud(snap['scan_id'], pcd)
+            path, extra = write_cloud(snap['scan_id'], pcd, snap.get('mesh'))
             extra['integrated'] = snap.get('updates', 0)
             return _finalize(snap, path, extra)
         if snap['mode'] == 'video':
