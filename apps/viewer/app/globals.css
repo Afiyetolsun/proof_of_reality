@@ -1,0 +1,335 @@
+/* ===== Base ===== */
+:root {
+  --bg: #0b0b0d;
+  --bg-card: #15161a;
+  --bg-elevated: #1c1d22;
+  --border: #2a2c33;
+  --text: #f4f4f5;
+  --text-muted: #9ca0a8;
+  --text-tertiary: #6c7079;
+  --accent: #6ee7b7;
+  --accent-fg: #042f1d;
+  --ok: #3ed598;
+  --fail: #ef6b6b;
+  --warn: #f4b740;
+  --link: #7eb6ff;
+
+  --radius: 14px;
+  --radius-lg: 20px;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f7f7f8;
+    --bg-card: #ffffff;
+    --bg-elevated: #f0f0f3;
+    --border: #e2e3e8;
+    --text: #0c0d10;
+    --text-muted: #5b6068;
+    --text-tertiary: #888d96;
+    --accent: #16a37a;
+    --accent-fg: #ffffff;
+    --link: #0857d8;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+a {
+  color: var(--link);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+.mono {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.92em;
+  word-break: break-all;
+}
+
+.muted {
+  color: var(--text-muted);
+}
+
+/* ===== Page layout ===== */
+.page {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 32px 20px 80px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.hero {
+  text-align: center;
+  padding: 24px 0 8px;
+}
+
+.hero-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.hero-icon {
+  font-size: 28px;
+  color: var(--accent);
+  filter: drop-shadow(0 0 12px rgba(110, 231, 183, 0.4));
+}
+
+.hero h1 {
+  font-size: clamp(24px, 5vw, 36px);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  margin: 0;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  word-break: break-all;
+}
+
+.hero-tag {
+  color: var(--text-muted);
+  margin: 8px auto 20px;
+  max-width: 540px;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.share-btn {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border: none;
+  border-radius: 999px;
+  padding: 12px 28px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.1s ease, box-shadow 0.2s ease;
+  box-shadow: 0 8px 30px rgba(110, 231, 183, 0.2);
+}
+.share-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 36px rgba(110, 231, 183, 0.3);
+}
+.share-btn:active {
+  transform: translateY(0);
+}
+
+/* ===== Cards ===== */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px 24px;
+}
+
+.card h2 {
+  margin: 0 0 14px;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+.scene-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+}
+
+.scene-card-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  text-align: center;
+}
+
+.scene-caption {
+  margin: 12px 4px 0;
+  font-size: 13px;
+}
+
+/* ===== Key/value list ===== */
+.kv {
+  display: grid;
+  grid-template-columns: minmax(120px, auto) 1fr;
+  gap: 10px 18px;
+  margin: 0;
+  font-size: 14px;
+}
+.kv dt {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+.kv dd {
+  margin: 0;
+  word-break: break-word;
+}
+.kv dd.mono,
+.kv .mono {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 13px;
+}
+
+/* ===== Verification badges ===== */
+.badges {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.badge {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+}
+
+.badge-ok {
+  border-color: rgba(62, 213, 152, 0.35);
+  background: rgba(62, 213, 152, 0.06);
+}
+
+.badge-fail {
+  border-color: rgba(239, 107, 107, 0.35);
+  background: rgba(239, 107, 107, 0.06);
+}
+
+.badge-icon {
+  font-size: 16px;
+  font-weight: 700;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.badge-ok .badge-icon {
+  background: var(--ok);
+  color: #032d1c;
+}
+.badge-fail .badge-icon {
+  background: var(--fail);
+  color: #fff;
+}
+
+.badge-name {
+  font-weight: 600;
+  font-size: 14px;
+}
+.badge-detail {
+  color: var(--text-muted);
+  font-size: 12.5px;
+  margin-top: 2px;
+}
+
+/* ===== Footer ===== */
+.footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* ===== Landing page ===== */
+.landing-hero {
+  text-align: center;
+  padding: 60px 0 40px;
+}
+
+.landing-hero h1 {
+  font-size: clamp(36px, 6vw, 56px);
+  margin: 0 0 16px;
+  letter-spacing: -0.02em;
+  font-weight: 700;
+}
+
+.landing-hero p {
+  max-width: 600px;
+  margin: 0 auto;
+  color: var(--text-muted);
+  font-size: 17px;
+  line-height: 1.55;
+}
+
+.landing-search {
+  display: flex;
+  gap: 8px;
+  margin: 32px auto 0;
+  max-width: 520px;
+}
+.landing-search input {
+  flex: 1;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  font-size: 15px;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+}
+.landing-search input::placeholder {
+  color: var(--text-tertiary);
+}
+.landing-search button {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border: none;
+  border-radius: var(--radius);
+  padding: 12px 22px;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 15px;
+}
+
+.landing-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 18px;
+  margin-top: 40px;
+}
+.landing-grid .card {
+  padding: 24px;
+}
+.landing-grid h3 {
+  margin: 0 0 8px;
+  font-size: 16px;
+}
+.landing-grid p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1.5;
+}

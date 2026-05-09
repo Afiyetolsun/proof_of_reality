@@ -13,12 +13,13 @@ const SAT_PUBKEY = process.env.NEXT_PUBLIC_SAT_PUBKEY;
  * once we have a confirmed cTRNG response from the booth.
  */
 export async function verifySatSig(nonce: Nonce): Promise<{ ok: boolean; detail: string }> {
-  if (!nonce.satSig.value || !nonce.satSig.pk) {
+  const satSig = nonce.satSig;
+  if (!satSig?.value || !satSig?.pk) {
     return { ok: false, detail: "missing satSig" };
   }
-  if (SAT_PUBKEY && SAT_PUBKEY.toLowerCase() !== nonce.satSig.pk.toLowerCase()) {
+  if (SAT_PUBKEY && SAT_PUBKEY.toLowerCase() !== satSig.pk.toLowerCase()) {
     return { ok: false, detail: "satellite pubkey does not match pinned value" };
   }
   // TODO: real curve verification once we know the algo (likely Ed25519 or P-256).
-  return { ok: true, detail: `pk=${nonce.satSig.pk.slice(0, 12)}…` };
+  return { ok: true, detail: `pk=${satSig.pk.slice(0, 12)}…` };
 }
