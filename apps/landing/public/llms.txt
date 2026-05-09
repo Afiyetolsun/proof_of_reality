@@ -1,0 +1,55 @@
+# Proof of Reality
+
+> Web3 oracle for the physical world. Cryptographic proof that an object exists in physical space, here, now.
+
+Proof of Reality is an open-source protocol developed for ETHPrague 2026 on the SpaceComputer track. It enables anyone to produce a tamper-evident, independently verifiable snapshot of a physical object anchored to five independent trust roots drawn from physics, hardware, and on-chain registries.
+
+## What it does
+
+A 30-second scan — via an iPhone (consumer) or a Luxonis OAK 4 D camera (industrial) — produces a `ProofBundle`: a canonical JSON document containing a 3D point cloud or Gaussian splat, satellite-signed cosmic entropy (cTRNG nonce from Orbitport), a KMS co-signature from SpaceComputer Space Fabric, and a hardware-resident device signature (Apple Secure Enclave or USB Armory Mk II). The bundle hash is stored on Swarm (content-addressed) and minted as an ERC-721 NFT on Base.
+
+Verifiers re-fetch the bundle from Swarm, recompute the canonical hash (JCS + keccak256), and check all five signatures against their public keys — with no trusted intermediary.
+
+## Why it matters
+
+- AI can generate photorealistic images of any object in under a second.
+- Marketplace listings, RWA tokens, and insurance claims all depend on photographs that are no longer trustworthy.
+- Proof of Reality adds a new primitive: "this object existed, here, at this moment" — cryptographically provable, satellite-anchored, hardware-signed.
+
+## Five witnesses
+
+1. **Cosmic nonce** — satellite-signed cTRNG entropy from SpaceComputer Orbitport. Cannot be pre-recorded.
+2. **KMS co-signature** — SpaceComputer Space Fabric signs the bundle hash. Requires live communication with the satellite network.
+3. **Device signature** — signed by a key that never leaves hardware (Apple Secure Enclave or USB Armory Mk II ECDSA in DCP + OTPMK).
+4. **Swarm content address** — the bundle is stored on Ethereum Swarm; its content hash is part of the proof.
+5. **App Attest** (iOS) — Apple certifies the signing app is genuine and unmodified.
+
+## Tech stack
+
+- **Capture**: iOS (Swift, Secure Enclave), Luxonis OAK 4 D (Python + DepthAI), USB Armory Mk II (bare-metal Go via TamaGo)
+- **Backend**: TypeScript, Vercel serverless, Express, viem
+- **Smart contracts**: Solidity 0.8.27, Hardhat, deployed on Base Sepolia
+- **Storage**: Ethereum Swarm (Bee node, BMT content addressing)
+- **Trust infrastructure**: SpaceComputer Orbitport (cTRNG + KMS), Apple App Attest
+- **Naming**: ENS subnames under `realityproof.eth` on Eth Sepolia
+- **Frontend**: Next.js 15, React 19, Tailwind CSS v4
+
+## Key pages
+
+- `/` — landing page with product overview, witness diagram, and live demo link
+- `/contact` — contact form (forwards to Telegram) + email support@realityproof.app
+- `/terms` — Terms & Conditions
+- `/privacy` — Privacy Policy
+- `/cookies` — Cookie Policy
+
+## Links
+
+- App: https://app.realityproof.app
+- GitHub: https://github.com/Afiyetolsun/proof_of_reality
+- X / Twitter: https://x.com/ProofReality
+- Telegram: https://t.me/ProofReality
+- Contact: support@realityproof.app
+
+## Source
+
+Open-source hackathon scaffold. All trust roots are public — a compromised backend cannot forge a valid proof.

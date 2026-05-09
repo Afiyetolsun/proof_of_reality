@@ -1,4 +1,7 @@
+"use client";
+
 import { type ReactNode } from "react";
+import { trackCtaClick } from "../lib/analytics";
 
 type Variant = "filled" | "ghost";
 type Size = "md" | "lg";
@@ -36,6 +39,11 @@ export function CTAButton({
       href={href}
       {...(external ? { target: "_blank", rel: "noreferrer" } : {})}
       className={`${base} ${variant === "filled" ? `${sizing} ${filled}` : ghost}`}
+      onClick={(e) => {
+        const label =
+          (e.currentTarget.querySelector("span")?.textContent ?? href).trim();
+        trackCtaClick(label, href, variant);
+      }}
     >
       <span>{children}</span>
       <span

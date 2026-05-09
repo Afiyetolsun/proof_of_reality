@@ -37,6 +37,7 @@ export function Footer() {
           ["Architecture", architectureUrl, true],
           ["Trust model", trustModelUrl, true],
           ["GitHub", githubUrl, true],
+          ["Contact", "/contact", false],
         ]} />
 
         <FooterCol title="App" links={[
@@ -50,15 +51,34 @@ export function Footer() {
           ["Swarm", "https://www.ethswarm.org", true],
           ["Base", "https://base.org", true],
         ]} />
+
+        <FooterCol title="Community" links={[
+          ["X / Twitter", "https://x.com/ProofReality", true],
+          ["Telegram", "https://t.me/ProofReality", true],
+        ]} />
       </div>
 
       <div className="mt-14 flex flex-col-reverse items-start justify-between gap-4 border-t border-[--color-rule] pt-6 md:flex-row md:items-center">
         <span className="text-mono-s text-[--color-ink-mute]">
           © {new Date().getFullYear()} · proof of reality · hackathon scaffold
         </span>
-        <span className="text-mono-s text-[--color-ink-mute]">
-          v0.1 · base-sepolia · live
-        </span>
+        <nav aria-label="Legal" className="flex flex-wrap items-center gap-x-5 gap-y-2">
+          {[
+            ["Terms", "/terms"],
+            ["Privacy", "/privacy"],
+            ["Cookies", "/cookies"],
+          ].map(([label, href]) => (
+            <a
+              key={label}
+              href={href}
+              className="text-mono-s text-[--color-ink-mute] underline decoration-transparent underline-offset-4 transition-colors hover:text-[--color-ink] hover:decoration-[--color-rule]"
+            >
+              {label}
+            </a>
+          ))}
+          <span className="text-mono-s text-[--color-ink-mute]">·</span>
+          <span className="text-mono-s text-[--color-ink-mute]">v0.1 · base-sepolia · live</span>
+        </nav>
       </div>
     </footer>
   );
