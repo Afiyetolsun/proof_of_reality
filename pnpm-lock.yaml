@@ -70,6 +70,49 @@ importers:
         specifier: ^37.14.0
         version: 37.14.0
 
+  apps/gallery:
+    dependencies:
+      geist:
+        specifier: ^1.3.1
+        version: 1.7.0(next@15.5.18(react-dom@19.2.6(react@19.2.6))(react@19.2.6))
+      next:
+        specifier: ^15.0.3
+        version: 15.5.18(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+      react:
+        specifier: ^19.0.0
+        version: 19.2.6
+      react-dom:
+        specifier: ^19.0.0
+        version: 19.2.6(react@19.2.6)
+      viem:
+        specifier: 2.21.45
+        version: 2.21.45(typescript@5.9.3)(zod@3.25.76)
+    devDependencies:
+      '@proof-of-reality/tsconfig':
+        specifier: workspace:*
+        version: link:../../packages/tsconfig
+      '@tailwindcss/postcss':
+        specifier: ^4.0.0
+        version: 4.3.0
+      '@types/node':
+        specifier: ^22.7.5
+        version: 22.19.18
+      '@types/react':
+        specifier: ^19.0.0
+        version: 19.2.14
+      '@types/react-dom':
+        specifier: ^19.0.0
+        version: 19.2.3(@types/react@19.2.14)
+      postcss:
+        specifier: ^8.4.49
+        version: 8.5.14
+      tailwindcss:
+        specifier: ^4.0.0
+        version: 4.3.0
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+
   apps/landing:
     dependencies:
       '@mkkellogg/gaussian-splats-3d':
@@ -136,6 +179,9 @@ importers:
       '@proof-of-reality/verified-swarm-fetch':
         specifier: workspace:*
         version: link:../../packages/verified-swarm-fetch
+      '@types/three':
+        specifier: ^0.165.0
+        version: 0.165.0
       next:
         specifier: ^15.0.3
         version: 15.5.18(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
@@ -145,6 +191,12 @@ importers:
       react-dom:
         specifier: ^19.0.0
         version: 19.2.6(react@19.2.6)
+      three:
+        specifier: ^0.166.1
+        version: 0.166.1
+      three-usdz-loader:
+        specifier: ^1.0.9
+        version: 1.0.9(three@0.166.1)
       viem:
         specifier: 2.21.45
         version: 2.21.45(typescript@5.9.3)(zod@3.25.76)
@@ -3600,8 +3652,16 @@ packages:
     resolution: {integrity: sha512-3ZBiG7JvP3wbDzA9iNY5zJQcHL4jn/0BWtXIkagfz7QgOL/LqjCEOBQuJNZfu0XYnv5JhKh+cDxCPM4ILrqruA==}
     engines: {node: '>=6.0.0'}
 
+  three-usdz-loader@1.0.9:
+    resolution: {integrity: sha512-UOP2XHHT4dUIZInhVPQieVXFyxpSE1ApMEJZVLDdo5j5flp1KSGlY1uGE3To7KhDIks+kAOmsCnNDjQ3RvjMFA==}
+    peerDependencies:
+      three: ^0.166.0
+
   three@0.165.0:
     resolution: {integrity: sha512-cc96IlVYGydeceu0e5xq70H8/yoVT/tXBxV/W8A/U6uOq7DXc4/s1Mkmnu6SqoYGhSRWWYFOhVwvq6V0VtbplA==}
+
+  three@0.166.1:
+    resolution: {integrity: sha512-LtuafkKHHzm61AQA1be2MAYIw1IjmhOUxhBa0prrLpEMWbV7ijvxCRHjSgHPGp2493wLBzwKV46tA9nivLEgKg==}
 
   through2@4.0.2:
     resolution: {integrity: sha512-iOqSav00cVxEEICeD7TjLB1sueEL+81Wpzp2bY17uZjZN0pWZPuo4suZ/61VujxmqSGFfgOcNuTZ85QJwNZQpw==}
@@ -7632,7 +7692,13 @@ snapshots:
       promise: 8.3.0
       qs: 6.15.1
 
+  three-usdz-loader@1.0.9(three@0.166.1):
+    dependencies:
+      three: 0.166.1
+
   three@0.165.0: {}
+
+  three@0.166.1: {}
 
   through2@4.0.2:
     dependencies:
