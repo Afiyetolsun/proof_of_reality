@@ -59,7 +59,13 @@ export function ProofScene({ url, attestor }: Props) {
     };
   }, [url]);
 
-  if (!mounted) {
+  // Treat the pre-format-detection state the same as the SSR placeholder.
+  // Otherwise we'd fall through to GlbCard while the HEAD probe is still
+  // in flight, eagerly mount <model-viewer> (which bundles its own
+  // three.js), and only later swap to UsdzCard — bloating the page,
+  // emitting a "Multiple instances of Three.js" warning, and racing the
+  // USD WASM init.
+  if (!mounted || (!error && format === "unknown")) {
     return (
       <div
         aria-hidden

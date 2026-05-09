@@ -107,7 +107,26 @@ export function UsdzCanvas({ url }: Props) {
         setStage(`fetched ${(blob.size / 1024).toFixed(0)} KB; loading Pixar USD WASM…`);
         if (disposed) return;
         const file = new File([blob], "scene.usdz", { type: "model/vnd.usdz+zip" });
-        await loader.loadFile(file, groupHolder);
+
+        // 60s timeout. The WASM init Promise can hang forever when a
+        // browser extension's SES/lockdown freezes prototypes Emscripten
+        // relies on (Brave Wallet does this; the symptom is "still
+        // waiting on run dependencies / dependency: wasm-instantiate").
+        // Without a timeout the user just sees an infinite spinner.
+        await Promise.race([
+          loader.loadFile(file, groupHolder),
+          new Promise<never>((_, reject) =>
+            setTimeout(
+              () =>
+                reject(
+                  new Error(
+                    "USD WASM init didn't finish in 60s. Likely a wallet extension (Brave Wallet, MetaMask Snaps) running SES lockdown — try a fresh Chrome window or open the file directly via the AR / QuickLook link below.",
+                  ),
+                ),
+              60_000,
+            ),
+          ),
+        ]);
         setStage("parsed; building three.js scene…");
         if (disposed) return;
         frameCamera(groupHolder, camera, controls);
