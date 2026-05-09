@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import argparse
 import hashlib
 import json
@@ -15,12 +17,26 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
+import bundle as bundle_mod
 import ply_writer
 import signer
+from backend import BackendClient, BackendError
 
 ROOT = Path(__file__).parent
 SCANS_DIR = ROOT / "scans"
 SCANS_DIR.mkdir(exist_ok=True)
+
+# Capture-mode → on-chain mint mode (backend expects 0|1|2).
+# photo + cloud are object captures (single object, possibly multi-frame);
+# video is a spatial recording (continuous frame stream).
+MINT_MODE_BY_CAPTURE = {"photo": 1, "cloud": 1, "video": 2}
+BUNDLE_MODE_BY_CAPTURE = {"photo": "objectCapture", "cloud": "objectCapture",
+                          "video": "spatial"}
+
+
+def _env(name: str, default=None):
+    v = os.environ.get(name)
+    return v if v not in (None, "") else default
 
 
 def parse_args():
@@ -31,8 +47,8 @@ def parse_args():
     p.add_argument("--http-port", type=int, default=8080)
     p.add_argument("--viz-port", type=int, default=8082)
     p.add_argument("--viz-url", default=None)
-    p.add_argument("--gotee-host", default="10.0.0.1")
-    p.add_argument("--gotee-port", type=int, default=4000)
+    p.add_argument("--gotee-host", default=_env("GOTEE_HOST", "10.0.0.1"))
+    p.add_argument("--gotee-port", type=int, default=int(_env("GOTEE_PORT", 4000)))
     p.add_argument("--no-sign", action="store_true")
     p.add_argument("--voxel-size", type=float, default=0.01,
                    help="TSDF voxel length in metres (cloud mode). 0.01 m "
@@ -51,6 +67,17 @@ def parse_args():
                         "whole-room or outdoor capture.")
     p.add_argument("--video-max-frames", type=int, default=600,
                    help="Hard cap on video-mode frames to bound RAM use")
+    p.add_argument("--backend-url", default=_env("BACKEND_URL"),
+                   help="proof-of-reality backend (e.g. https://proof-of-reality-api.vercel.app). "
+                        "Empty = backend disabled, scans stay local.")
+    p.add_argument("--shared-secret",
+                   default=_env("CAMERA_SHARED_SECRET", _env("IOS_SHARED_SECRET")),
+                   help="X-Camera-Key for the backend. Reads CAMERA_SHARED_SECRET first, "
+                        "then falls back to IOS_SHARED_SECRET.")
+    p.add_argument("--device-bundle-id",
+                   default=_env("DEVICE_BUNDLE_ID", "io.luxonis.scan-and-sign"))
+    p.add_argument("--no-mint", action="store_true",
+                   help="Build + sign locally but skip backend upload/mint.")
     a = p.parse_args()
     w, h = (int(v) for v in a.size.lower().split("x"))
     a.size = (w, h)
@@ -465,15 +492,16 @@ def _hash_file(path):
     return h.hexdigest()
 
 
-def make_app(args, mgr):
+def make_app(args, mgr, backend: BackendClient | None):
     app = FastAPI()
     app.mount("/static", StaticFiles(directory=str(ROOT / "static")), name="static")
 
     def _finalize(snap, artifact_path, extra):
         sha = _hash_file(artifact_path)
+        capture_mode = snap['mode']
         envelope = {
             "scan_id": snap['scan_id'],
-            "mode": snap['mode'],
+            "mode": capture_mode,
             "artifact": artifact_path.name,
             "artifact_sha256": sha,
             "ply_sha256": sha,  # legacy alias
@@ -482,17 +510,110 @@ def make_app(args, mgr):
             "ts": int(snap['t_end']),
             "duration_s": round(snap['t_end'] - snap['t_start'], 3),
             "gotee": None,
+            "bundle": None,
+            "bundle_hash": None,
+            "backend": None,
+            "mint": None,
             **extra,
         }
+
+        # Local-only path: no backend → sign the artifact hash directly,
+        # matching the historical envelope shape.
+        if backend is None or args.no_mint:
+            if not args.no_sign:
+                try:
+                    envelope['gotee'] = signer.sign(
+                        sha, host=args.gotee_host, port=args.gotee_port)
+                except signer.GoteeError as e:
+                    envelope['gotee'] = {"error": str(e)}
+            _write_envelope(envelope, snap['scan_id'])
+            return envelope
+
+        # Backend path: nonce → canonical bundle → sign bundle hash → upload → mint.
+        nonce_resp = None
+        try:
+            nonce_resp = backend.get_nonce()
+            envelope["backend"] = {"nonce": nonce_resp}
+        except BackendError as e:
+            envelope["backend"] = {"nonce_error": str(e)}
+
+        nonce_value = (nonce_resp or {}).get("nonce", "")
+        sat_sig = (nonce_resp or {}).get("satSig", "")
+        nonce_expires_at = int((nonce_resp or {}).get("expiresAt", snap['t_end']))
+
+        intrinsics = (
+            (mgr.K[0, 0], mgr.K[1, 1], mgr.K[0, 2], mgr.K[1, 2],
+             float(mgr.W or 0), float(mgr.H or 0)) if mgr.K is not None else None
+        )
+        frames = extra.get('frame_count') or extra.get('integrated') or 0
+        bundle_dict, bundle_bytes, bundle_hash = bundle_mod.build(
+            scene_path=artifact_path,
+            scene_sha256_hex=sha,
+            nonce=nonce_value,
+            sat_sig=sat_sig,
+            nonce_expires_at=nonce_expires_at,
+            mode=BUNDLE_MODE_BY_CAPTURE[capture_mode],
+            sensors_hash_hex=bundle_mod.sensors_hash(
+                snap['scan_id'], snap['t_start'], snap['t_end'],
+                int(frames), intrinsics,
+            ),
+            device_model=os.environ.get("OAK_DEVICE_MODEL", "oak"),
+            device_bundle_id=args.device_bundle_id,
+            created_at=int(snap['t_end']),
+        )
+        envelope["bundle"] = bundle_dict
+        envelope["bundle_hash"] = bundle_hash
+        bundle_path = SCANS_DIR / f"{snap['scan_id']}.bundle.json"
+        bundle_path.write_bytes(bundle_bytes)
+
+        attestation_hex = ""
         if not args.no_sign:
             try:
-                envelope['gotee'] = signer.sign(
-                    sha, host=args.gotee_host, port=args.gotee_port)
+                gotee_env = signer.sign(
+                    bundle_hash[2:],
+                    host=args.gotee_host, port=args.gotee_port)
+                envelope["gotee"] = gotee_env
+                attestation_hex = signer.pack_attestation(gotee_env)
             except signer.GoteeError as e:
-                envelope['gotee'] = {"error": str(e)}
-        env_path = SCANS_DIR / f"{snap['scan_id']}.json"
-        env_path.write_text(json.dumps(envelope, indent=2))
+                envelope["gotee"] = {"error": str(e)}
+
+        # Without a nonce we can't satisfy the canonical iOS shape, so don't
+        # mint — keep the local envelope (with bundle + gotee) for retry later.
+        if nonce_resp is None:
+            _write_envelope(envelope, snap['scan_id'])
+            return envelope
+
+        try:
+            up = backend.upload_or_local(bundle_bytes, artifact_path)
+            envelope["backend"]["upload"] = up
+            swarm_ref = up["swarmRef"]
+            bundle_ref = (up.get("bundleRef")
+                          or f"local:{bundle_hash[2:]}")
+            cosmo_sig = up.get("cosmoSig")
+
+            mint_resp = backend.mint(
+                swarm_ref=swarm_ref,
+                bundle_ref=bundle_ref,
+                bundle_hash=bundle_hash,
+                sat_sig=sat_sig,
+                cosmo_sig=cosmo_sig,
+                attestation=attestation_hex or "MOCK",
+                attestation_type=1,
+                captured_at=int(snap['t_end']),
+                mode=MINT_MODE_BY_CAPTURE[capture_mode],
+            )
+            envelope["mint"] = mint_resp
+        except BackendError as e:
+            envelope["backend"]["error"] = str(e)
+        except Exception as e:
+            envelope["backend"]["error"] = f"{type(e).__name__}: {e}"
+
+        _write_envelope(envelope, snap['scan_id'])
         return envelope
+
+    def _write_envelope(envelope, scan_id):
+        env_path = SCANS_DIR / f"{scan_id}.json"
+        env_path.write_text(json.dumps(envelope, indent=2))
 
     @app.get("/", response_class=HTMLResponse)
     def index():
@@ -503,7 +624,29 @@ def make_app(args, mgr):
         return {"viz_port": args.viz_port, "viz_url": args.viz_url,
                 "fps": args.fps, "size": list(args.size),
                 "no_sign": bool(args.no_sign),
+                "no_mint": bool(args.no_mint or backend is None),
+                "backend_url": args.backend_url or None,
                 "video_max_frames": args.video_max_frames}
+
+    @app.get("/healthz")
+    def healthz():
+        connected, msg = signer.token_status(args.gotee_host, args.gotee_port)
+        backend_ok = False
+        backend_msg = "disabled"
+        if backend is not None:
+            try:
+                backend.health()
+                backend_ok = True
+                backend_msg = backend.base_url
+            except BackendError as e:
+                backend_msg = str(e)
+        return {
+            "token": {"connected": connected, "msg": msg,
+                      "host": args.gotee_host, "port": args.gotee_port},
+            "backend": {"ok": backend_ok, "msg": backend_msg,
+                        "url": backend.base_url if backend else None},
+            "ready": connected and (backend_ok or backend is None),
+        }
 
     @app.post("/capture/photo")
     def capture_photo():
@@ -615,6 +758,16 @@ def main():
     )
     stop_event = threading.Event()
 
+    backend: BackendClient | None = None
+    if args.backend_url and args.shared_secret:
+        backend = BackendClient(args.backend_url, args.shared_secret)
+        print(f"[backend] {args.backend_url} (auth: X-Camera-Key)")
+    elif args.backend_url and not args.shared_secret:
+        print("[backend] BACKEND_URL set but CAMERA_SHARED_SECRET / IOS_SHARED_SECRET "
+              "missing — backend disabled")
+    else:
+        print("[backend] disabled (BACKEND_URL not set) — scans stay local")
+
     def pipeline_thread():
         try:
             build_pipeline(args, mgr, stop_event)
@@ -626,7 +779,9 @@ def main():
     t = threading.Thread(target=pipeline_thread, daemon=True)
     t.start()
 
-    app = make_app(args, mgr)
+    app = make_app(args, mgr, backend)
+    print(f"[http] control panel  http://0.0.0.0:{args.http_port}/")
+    print(f"[http] live preview   http://0.0.0.0:{args.viz_port}/")
     try:
         uvicorn.run(app, host="0.0.0.0", port=args.http_port, log_level="info")
     finally:

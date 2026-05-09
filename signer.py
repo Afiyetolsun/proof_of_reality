@@ -12,6 +12,7 @@ gotee_starter scripts learned the hard way.
 
 import json
 import shutil
+import socket
 import subprocess
 
 
@@ -21,6 +22,16 @@ class GoteeError(RuntimeError):
 
 def _have_nc():
     return shutil.which("nc") is not None
+
+
+def token_status(host="10.0.0.1", port=4000, timeout=2):
+    """Quick reachability probe for the gotee bridge — used by the UI to show
+    whether the USB Armory is plugged in. Returns (connected, message)."""
+    try:
+        with socket.create_connection((host, port), timeout=timeout):
+            return True, f"{host}:{port} reachable"
+    except Exception as e:
+        return False, f"{type(e).__name__}: {e}"
 
 
 def call_bridge(method, input_str, host="10.0.0.1", port=4000, timeout=5):
@@ -67,3 +78,23 @@ def sign(payload_hex, host="10.0.0.1", port=4000, timeout=5):
         if k not in env:
             raise GoteeError(f"applet reply missing field {k!r}: {env}")
     return env
+
+
+def pack_attestation(env: dict) -> str:
+    """Pack a gotee Sign envelope into a single hex blob suitable for the
+    backend's `attestation` field (stored on-chain as raw bytes). Layout:
+    device_id || nonce || mac, all hex-decoded then concatenated.
+
+    Each field is hex-decoded if it parses as hex; otherwise its UTF-8 bytes
+    are hex-encoded so the result is always a valid 0x-prefixed hex string."""
+    parts = []
+    for k in ("device_id", "nonce", "mac"):
+        v = str(env[k])
+        if v.startswith("0x") or v.startswith("0X"):
+            v = v[2:]
+        try:
+            bytes.fromhex(v)
+            parts.append(v)
+        except ValueError:
+            parts.append(env[k].encode("utf-8").hex())
+    return "0x" + "".join(parts)

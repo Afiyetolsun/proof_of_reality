@@ -1,5 +1,5 @@
 identifier = "com.example.apps.scan-and-sign"
-app_version = "0.1.0"
+app_version = "0.2.0"
 
 prepare_container = [
     { type = "RUN", command = "apt-get update" },
@@ -12,9 +12,16 @@ prepare_build_container = []
 
 build_steps = []
 
-# --gotee-host is set to the OAK's main LAN IP at runtime so the container
-# reaches the TCP forwarder (which proxies to usb0:10.0.0.1:4000 — the
-# Armory bridge). See scripts/forwarder.py.
+# Runtime config is read from env vars by main.py. Push them with
+#   oakctl app config set <app-id> --env KEY=VALUE [--restart]
+# Variables:
+#   BACKEND_URL            (e.g. https://proof-of-reality-api.vercel.app)
+#   CAMERA_SHARED_SECRET   (preferred; pairs with backend's CAMERA_SHARED_SECRET)
+#   IOS_SHARED_SECRET      (legacy fallback)
+#   GOTEE_HOST/GOTEE_PORT  (default 10.0.0.1:4000 — overridden below to OAK's
+#                           main LAN IP so the container reaches the host-side
+#                           TCP forwarder which proxies to the Armory bridge)
+#   DEVICE_BUNDLE_ID       (default io.luxonis.scan-and-sign)
 entrypoint = [
     "bash", "-c",
     "python3 -u /app/main.py --gotee-host $(hostname -I | awk '{print $1}')",
