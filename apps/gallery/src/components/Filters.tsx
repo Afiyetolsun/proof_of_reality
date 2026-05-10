@@ -56,10 +56,13 @@ export function parseFilters(sp: Record<string, string | string[] | undefined>):
  *      Bump SHOWCASE_CUTOFF_UNIX to a later day to roll the second
  *      axis forward.
  */
-// 2026-05-10 00:00:00 UTC. Kept as a literal Unix seconds value so
-// it's obvious what it means and there's no Date-dependent surprise.
-// Verify: `node -e "console.log(new Date(1778371200 * 1000).toISOString())"`
-const SHOWCASE_CUTOFF_UNIX = 1778371200;
+// Demo-day cutoff. Anything created on or after this moment counts as
+// "featured" regardless of digit count. Edit the date string and
+// commit — no magic Unix seconds, no `new Date()` wall-clock surprise.
+const SHOWCASE_CUTOFF_DATE = "2026-05-10T00:00:00Z";
+const SHOWCASE_CUTOFF_UNIX = Math.floor(
+  Date.parse(SHOWCASE_CUTOFF_DATE) / 1000,
+);
 
 export function isFeatured(record: {
   name: string;
