@@ -22,4 +22,11 @@ struct MintRecord: Codable, Hashable {
         guard let name = ensName, !name.isEmpty else { return nil }
         return URL(string: "https://sepolia.app.ens.domains/\(name)")
     }
+
+    /// realityproof.app viewer URL keyed by ENS subname. Nil when no
+    /// ENS handle was published.
+    var realityProofURL: URL? {
+        guard let name = ensName, !name.isEmpty else { return nil }
+        return URL(string: "https://app.realityproof.app/\(name)")
+    }
 }

@@ -350,10 +350,22 @@ struct ProofSummaryView: View {
             }
             .padding(.top, 2)
 
-            // 4. Action row — ENS first (primary, prominent), Basescan
-            // second (secondary). Share lives in the parent buttonRow
-            // and stays untouched.
+            // 4. Action row — Proof of Reality viewer is the prominent
+            // primary action (full width), with ENS and Basescan
+            // beneath as secondary links. Share lives in the parent
+            // buttonRow and stays untouched.
             if hasENS || record.explorerURL != nil {
+                if let viewerURL = record.realityProofURL {
+                    Link(destination: viewerURL) {
+                        Label("Proof of Reality", systemImage: "checkmark.seal.fill")
+                            .font(.subheadline.bold())
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 10)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.green)
+                    .padding(.top, 4)
+                }
                 HStack(spacing: 8) {
                     if let ensURL = record.ensURL {
                         Link(destination: ensURL) {
@@ -362,8 +374,8 @@ struct ProofSummaryView: View {
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 8)
                         }
-                        .buttonStyle(.borderedProminent)
-                        .tint(.green)
+                        .buttonStyle(.bordered)
+                        .tint(tint)
                     }
                     if let explorerURL = record.explorerURL {
                         Link(destination: explorerURL) {
