@@ -17,7 +17,12 @@ import { listSubnames } from "@/lib/ens-subgraph";
 import { hydrateRecords, type SubnameRecord } from "@/lib/ens-records";
 import { isResolverConfigured, listProofsFromResolver } from "@/lib/ens-resolver";
 import { Card } from "@/components/Card";
-import { Filters, parseFilters, type FilterState } from "@/components/Filters";
+import {
+  Filters,
+  parseFilters,
+  isFeatured,
+  type FilterState,
+} from "@/components/Filters";
 import { ensAppParentUrl, ensParentName } from "@/lib/viewer-link";
 import { LandingSearch } from "@/components/LandingSearch";
 
@@ -149,7 +154,9 @@ function GalleryFallback({ filters }: { filters: FilterState }) {
 
 function applyFilters(records: SubnameRecord[], f: FilterState): SubnameRecord[] {
   let out = records;
-  if (f.mode !== "all") {
+  if (f.mode === "featured") {
+    out = out.filter((r) => isFeatured(r));
+  } else if (f.mode !== "all") {
     out = out.filter((r) => r.mode === f.mode);
   }
   out = [...out].sort((a, b) =>

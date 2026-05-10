@@ -82,7 +82,19 @@ export async function maybeConvertScene(record: EnsRecord): Promise<EnsRecord> {
       console.warn(`[converter] ${convertUrl} → ${res.status}`);
       return record;
     }
-    const json = (await res.json()) as { glbRef?: string };
+    // Manual parse so a non-JSON body doesn't surface as a "Console
+    // SyntaxError" overlay in Next.js dev mode. See gallery's
+    // converter.ts for the longer rationale.
+    const text = await res.text();
+    let json: { glbRef?: string };
+    try {
+      json = JSON.parse(text) as { glbRef?: string };
+    } catch {
+      console.warn(
+        `[converter] ${convertUrl} returned non-JSON: ${text.slice(0, 80)}…`,
+      );
+      return record;
+    }
     if (!json.glbRef) {
       console.warn(`[converter] ${convertUrl} returned no glbRef`);
       return record;

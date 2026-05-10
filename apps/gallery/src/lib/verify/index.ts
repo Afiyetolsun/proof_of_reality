@@ -96,21 +96,32 @@ export async function runVerification(proof: unknown): Promise<VerificationCheck
   checks.push({ name: "Swarm content addressing", ok: true, detail: bundleRes.scope });
 
   // Defensive parse — if iOS uploaded the wrong file (e.g. the scene
-  // USDZ instead of the bundle JSON, "PK..." being the ZIP magic), the
-  // JSON.parse throws synchronously and crashes the page. Surface as
-  // a clean check instead.
+  // USDZ "PK..." ZIP magic, or a PLY/USD ASCII header), JSON.parse
+  // throws a SyntaxError that Next.js dev-tools surface as a "Console
+  // SyntaxError" overlay even when caught. Pre-check the first byte
+  // for a JSON sentinel ({, [, ", -, 0-9) and short-circuit with a
+  // regular Error before JSON.parse ever runs.
+  const text = new TextDecoder().decode(bundleRes.data);
+  const head = text
+    .slice(0, 16)
+    .replace(/[^\x20-\x7e]/g, ".");
+  const trimmed = text.trimStart();
   let bundle;
-  try {
-    const text = new TextDecoder().decode(bundleRes.data);
-    bundle = parseProofBundle(JSON.parse(text));
-  } catch (e) {
-    const head = new TextDecoder()
-      .decode(bundleRes.data.slice(0, 16))
-      .replace(/[^\x20-\x7e]/g, ".");
+  if (trimmed.length === 0 || !/^[{[\"\d\-tfn]/.test(trimmed)) {
     checks.push({
       name: "Bundle parse",
       ok: false,
-      detail: `bundleRef pointed at non-JSON ("${head}…") — iOS likely sent the scene ref as bundleRef. ${(e as Error).message}`,
+      detail: `bundleRef pointed at non-JSON ("${head}…") — iOS likely sent the scene ref as bundleRef.`,
+    });
+    return checks;
+  }
+  try {
+    bundle = parseProofBundle(JSON.parse(trimmed));
+  } catch (e) {
+    checks.push({
+      name: "Bundle parse",
+      ok: false,
+      detail: `bundleRef parsed but didn't match the proof-bundle schema ("${head}…"). ${(e as Error).message}`,
     });
     return checks;
   }

@@ -69,6 +69,19 @@
     border-radius: 2px;
   }
 
+  /* model-viewer takes focus on click for orbit/zoom interactions; the
+     default browser/Chrome focus ring is a blue rectangle that doesn't
+     follow the rounded-[20px] of our scene card and looks broken
+     against the orange brand. Suppress all focus rings on the canvas
+     itself — interaction state is obvious from the cursor + ar prompt. */
+  model-viewer,
+  model-viewer:focus,
+  model-viewer:focus-visible,
+  model-viewer:focus-within {
+    outline: none !important;
+    border: none !important;
+  }
+
   ::-webkit-scrollbar {
     width: 10px;
     height: 10px;

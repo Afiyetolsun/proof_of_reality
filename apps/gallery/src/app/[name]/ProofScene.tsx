@@ -2,10 +2,6 @@
 
 import Script from "next/script";
 import { useEffect, useRef, useState } from "react";
-import * as THREE from "three";
-import { LineSegments2 } from "three/addons/lines/LineSegments2.js";
-import { LineMaterial } from "three/addons/lines/LineMaterial.js";
-import { LineSegmentsGeometry } from "three/addons/lines/LineSegmentsGeometry.js";
 
 interface Props {
   url: string;
@@ -19,7 +15,24 @@ interface Props {
   mode?: string;
 }
 
-type SceneFormat = "glb" | "usdz" | "unknown";
+type SceneFormat = "glb" | "usdz" | "unsupported" | "unknown";
+
+/**
+ * Content-type / extension hints that we *recognize* but can't render
+ * in <model-viewer>. Hitting any of these means the contenthash points
+ * at a raw 3D capture format (PLY mesh, OBJ, raw USD ASCII, …) that
+ * the server-side converter couldn't downcast to GLB. We need to
+ * detect them explicitly because letting <model-viewer> try to load
+ * them produces a noisy `THREE.GLTFLoader: Unsupported asset` console
+ * error that surfaces in the Next.js dev overlay.
+ */
+const UNSUPPORTED_SCENE_HINTS = [
+  "ply",         // Polygon File Format (Object Capture intermediate)
+  "obj",         // Wavefront OBJ
+  "stl",         // Stereolithography
+  "fbx",         // Autodesk FBX
+  "octet-stream", // generic binary, with a non-glb/usdz extension
+];
 
 /**
  * 3D scene preview for the per-name page.
@@ -55,7 +68,7 @@ export function ProofScene({ url, attestor, mode }: Props) {
         const cd = r.headers.get("content-disposition") ?? "";
         const filename = /filename="?([^";]+)"?/.exec(cd)?.[1] ?? "";
         const ext = filename.toLowerCase().split(".").pop() ?? "";
-        if (ct.includes("usdz") || ct.includes("usd") || ext === "usdz") {
+        if (ct.includes("usdz") || ext === "usdz") {
           setFormat("usdz");
         } else if (
           ct.includes("gltf") ||
@@ -64,8 +77,16 @@ export function ProofScene({ url, attestor, mode }: Props) {
           ext === "gltf"
         ) {
           setFormat("glb");
+        } else if (
+          UNSUPPORTED_SCENE_HINTS.some((h) => ct.includes(h)) ||
+          ["ply", "obj", "stl", "fbx", "usd", "usda", "usdc"].includes(ext)
+        ) {
+          // Known 3D format we can't render in <model-viewer>. Show a
+          // dedicated card instead of falling through to a noisy
+          // GLTFLoader error.
+          setFormat("unsupported");
         } else {
-          // Default to GLB-attempt; model-viewer will at least try.
+          // Truly unknown — assume GLB and let model-viewer try.
           setFormat("glb");
         }
       })
@@ -106,8 +127,85 @@ export function ProofScene({ url, attestor, mode }: Props) {
   if (format === "usdz") {
     return <UsdzCard url={url} attestor={attestor} />;
   }
+  if (format === "unsupported") {
+    return <UnsupportedCard url={url} attestor={attestor} />;
+  }
   return <GlbCard url={url} attestor={attestor} mode={mode} />;
 }
+
+/**
+ * Fallback for known 3D formats we can't render in-canvas (PLY, OBJ,
+ * raw USD ASCII, etc). Surfaces a clear "download to view" CTA
+ * instead of letting model-viewer's GLTFLoader log
+ * "Unsupported asset. glTF versions >=2.0 are supported." into the
+ * dev console.
+ */
+function UnsupportedCard({ url, attestor }: { url: string; attestor?: string }) {
+  return (
+    <div className="rounded-[20px] border border-[--color-rule] bg-[--color-surface-raised] p-10 text-center">
+      <div
+        aria-hidden
+        className="mx-auto mb-4 text-[44px] leading-none text-[--color-signal]"
+        style={{ filter: "drop-shadow(0 4px 24px oklch(0.74 0.14 58 / 0.30))" }}
+      >
+        ◆
+      </div>
+      <div className="text-eyebrow font-mono uppercase tracking-[0.14em] text-[--color-ink-mute]">
+        3D scene
+      </div>
+      <p className="mx-auto mt-3 max-w-[44ch] text-body-s text-[--color-ink-mute]">
+        This capture is in a 3D format the in-browser viewer doesn&apos;t support
+        (PLY, OBJ, raw USD, etc). Download it to open in Blender, Maya,
+        QuickLook, or your tool of choice.
+      </p>
+      <a
+        href={url}
+        download
+        className="mt-6 inline-block rounded-full bg-[--color-signal] px-6 py-3 text-mono-s font-semibold text-[--color-surface-deep]"
+      >
+        Download scene
+      </a>
+      <div className="mt-6">
+        <Caption attestor={attestor} />
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Room-scan render tuning. Tweak these to taste — they're the only
+// numbers you have to edit to change how RoomPlan captures look.
+// ─────────────────────────────────────────────────────────────────────
+//
+// ROOM_BASE_COLOR: linear-RGB-A (0..1). The flat color every wall /
+// floor / ceiling material gets painted with in `roomPlan` mode.
+// Dark + neutral makes the IBL contribution the dominant signal at
+// every face, which is what produces visible corner steps. Brightening
+// this wipes the corners back out (bright surfaces saturate). For a
+// warmer apartment feel try [0.32, 0.30, 0.27, 1].
+const ROOM_BASE_COLOR: [number, number, number, number] = [0.22, 0.24, 0.27, 1];
+
+// ROOM_ROUGHNESS: 0 = mirror, 1 = matte. Forced to 1 because RoomPlan
+// USDZ sometimes imports as glossy plastic which catches specular and
+// washes out edge contrast.
+const ROOM_ROUGHNESS = 1;
+
+// ROOM_EXPOSURE: model-viewer `exposure` attribute for room scans.
+// Lower values darken the whole scene so corner shadows read against
+// the dark base color. Object captures get their own default below.
+const ROOM_EXPOSURE = "0.85";
+
+// ROOM_SHADOW_INTENSITY / ROOM_SHADOW_SOFTNESS: model-viewer's ground
+// shadow. A sharp shadow under the room places it in space and adds
+// another tonal layer.
+const ROOM_SHADOW_INTENSITY = "1";
+const ROOM_SHADOW_SOFTNESS = "0.4";
+
+// OBJECT_EXPOSURE / OBJECT_SHADOW_*: same knobs for object captures
+// (textured photogrammetry — needs different treatment).
+const OBJECT_EXPOSURE = "1.0";
+const OBJECT_SHADOW_INTENSITY = "1";
+const OBJECT_SHADOW_SOFTNESS = "0.6";
 
 function GlbCard({
   url,
@@ -121,32 +219,32 @@ function GlbCard({
   const isRoom = mode === "roomPlan" || mode === "room";
   const ref = useRef<HTMLElement | null>(null);
 
-  // Architectural-diagram render for room scans. Lighting alone can't
-  // make a white-on-white room legible: PBR on uniform-color planar
-  // surfaces gives identical brightness on both sides of a corner, so
-  // the seam is literally not in the image. Three things together fix
-  // it:
+  // Material tweaks applied on GLB load. Uses only model-viewer's
+  // PUBLIC material API (`mv.model.materials[i]`) — no traversal of
+  // the internal three.js scene, which broke between model-viewer
+  // versions and silently no-op'd, leaving room scans rendering
+  // uniformly white.
   //
-  // 1. Per-face shading. We compute a face normal for every triangle
-  //    in every mesh and write a per-vertex color based on that normal:
-  //    floor (normal up) → warm beige, ceiling (normal down) → cool
-  //    grey, walls → calm tones varying by horizontal facing. We then
-  //    swap the mesh's material for a flat MeshBasicMaterial with
-  //    vertexColors = true, so each face renders its own shade.
-  //    No more white-on-white.
+  // For every material we:
+  //  1. Force double-sided rendering. RoomPlan exports walls as
+  //     single-sided planes facing inward; without this, the
+  //     auto-framed camera sitting outside the bounding box only sees
+  //     backfaces and the room collapses to a floor plane.
   //
-  // 2. Bold edge overlay using Line2/LineMaterial — Three.js's
-  //    screen-space-thick line primitive. Plain LineSegments uses
-  //    WebGL gl.LINES which is capped at 1px on every desktop browser
-  //    and was invisible at distance. Line2 renders lines as
-  //    camera-facing quads, so we can ask for 3 px and actually get
-  //    3 px. Edges are extracted at a 22° angle threshold — corners,
-  //    doors, window frames pop; coplanar triangle seams stay quiet.
+  // For room scans only we additionally:
+  //  2. Set every base color factor to a dark cool slate. The reason
+  //     white-on-white rooms look like a single solid hull is that PBR
+  //     on equally-bright planar surfaces gives no luminance step at
+  //     corners. Dark + matte (roughness=1) reverses this — IBL +
+  //     shadow then produce strong dark/light corner transitions
+  //     because a corner is the one place where the local normal
+  //     turns 90° and the radiance integral changes a lot.
+  //  3. Push roughness to 1 (matte) and metallic to 0. RoomPlan
+  //     materials sometimes import as low-roughness which catches
+  //     specular and washes the geometry out.
   //
-  // 3. Polygon offset + double-sided + back to PBR for object captures.
-  //    Object scans with photogrammetry textures don't get the
-  //    architectural treatment — they keep their PBR materials and
-  //    just get the safety surgeries (doubleSided, polygonOffset).
+  // Configuration knobs live below as `ROOM_*` constants — tweak the
+  // base color and roughness numbers to taste.
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
@@ -158,175 +256,21 @@ function GlbCard({
       try {
         const mats = mv.model?.materials ?? [];
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        for (const m of mats) {
+        mats.forEach((m: any) => {
           m.setDoubleSided?.(true);
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const tm: any =
-            m[Symbol.for("material")] ??
-            m.threeMaterial ??
-            m._material;
-          if (tm) {
-            tm.polygonOffset = true;
-            tm.polygonOffsetFactor = 1;
-            tm.polygonOffsetUnits = 1;
-            tm.needsUpdate = true;
+          if (!isRoom) return;
+          // Public material API only — works regardless of which
+          // model-viewer version is loaded.
+          try {
+            m.pbrMetallicRoughness?.setBaseColorFactor?.(ROOM_BASE_COLOR);
+            m.pbrMetallicRoughness?.setRoughnessFactor?.(ROOM_ROUGHNESS);
+            m.pbrMetallicRoughness?.setMetallicFactor?.(0);
+          } catch {
+            /* material API may be locked on some glTF imports — skip */
           }
-        }
-
-        if (!isRoom) return;
-
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const root: THREE.Object3D | null =
-          mv[Symbol.for("scene")] ??
-          mv[Symbol.for("threeScene")] ??
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (mv.model as any)?.[Symbol.for("model")] ??
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (mv.model as any)?.modelContainer ??
-          null;
-        if (!root || typeof root.traverse !== "function") {
-          console.warn("[scene] couldn't find three.js root in model-viewer");
-          return;
-        }
-
-        // Calm architectural palette. Each pair of perpendicular
-        // surfaces ends up in a different bucket, so corners always
-        // show a tonal step.
-        const FLOOR: [number, number, number] = [0.86, 0.80, 0.70];
-        const CEILING: [number, number, number] = [0.62, 0.66, 0.72];
-        const WALLS: [number, number, number][] = [
-          [0.94, 0.94, 0.96],
-          [0.78, 0.82, 0.86],
-          [0.88, 0.86, 0.82],
-          [0.82, 0.85, 0.80],
-        ];
-        const colorForNormal = (
-          nx: number,
-          ny: number,
-          nz: number,
-        ): [number, number, number] => {
-          if (ny > 0.7) return FLOOR;
-          if (ny < -0.7) return CEILING;
-          // Horizontal walls — bin by atan2(z, x) into 4 buckets so
-          // adjacent walls (90° apart) always land in different bins.
-          const angle = Math.atan2(nz, nx);
-          const bin = ((Math.floor(((angle + Math.PI) / (2 * Math.PI)) * 4) %
-            4) +
-            4) %
-            4;
-          return WALLS[bin]!;
-        };
-
-        // We need the renderer canvas size for Line2 resolution.
-        const canvas = mv.shadowRoot?.querySelector("canvas") as
-          | HTMLCanvasElement
-          | undefined;
-        const resolution = new THREE.Vector2(
-          canvas?.width ?? 1280,
-          canvas?.height ?? 720,
-        );
-
-        const lineMat = new LineMaterial({
-          color: 0x0a0d12, // near-black; reads as ink against any wall
-          linewidth: 3, // pixels
-          worldUnits: false,
-          transparent: true,
-          opacity: 1,
-          depthTest: true,
-          resolution,
         });
-
-        root.traverse((child: THREE.Object3D) => {
-          const mesh = child as THREE.Mesh;
-          if (!mesh.isMesh || !mesh.geometry) return;
-          if (mesh.userData._archified) return;
-
-          const geom = mesh.geometry as THREE.BufferGeometry;
-          const pos = geom.getAttribute("position") as THREE.BufferAttribute;
-          if (!pos) return;
-
-          // Compute per-vertex colors from face normals. To get a flat
-          // (one-color-per-face) look we'd need un-shared vertices;
-          // RoomPlan walls don't share vertices across different walls
-          // anyway, so writing the face color to each of the
-          // triangle's three vertices works in practice.
-          const colors = new Float32Array(pos.count * 3);
-          const va = new THREE.Vector3();
-          const vb = new THREE.Vector3();
-          const vc = new THREE.Vector3();
-          const ab = new THREE.Vector3();
-          const ac = new THREE.Vector3();
-          const normal = new THREE.Vector3();
-
-          const writeFace = (a: number, b: number, c: number) => {
-            va.fromBufferAttribute(pos, a);
-            vb.fromBufferAttribute(pos, b);
-            vc.fromBufferAttribute(pos, c);
-            ab.subVectors(vb, va);
-            ac.subVectors(vc, va);
-            normal.crossVectors(ab, ac).normalize();
-            const [r, g, bl] = colorForNormal(normal.x, normal.y, normal.z);
-            for (const vi of [a, b, c]) {
-              colors[vi * 3] = r;
-              colors[vi * 3 + 1] = g;
-              colors[vi * 3 + 2] = bl;
-            }
-          };
-
-          const idx = geom.index;
-          if (idx) {
-            for (let i = 0; i < idx.count; i += 3) {
-              writeFace(idx.getX(i), idx.getX(i + 1), idx.getX(i + 2));
-            }
-          } else {
-            for (let i = 0; i < pos.count; i += 3) {
-              writeFace(i, i + 1, i + 2);
-            }
-          }
-
-          geom.setAttribute("color", new THREE.BufferAttribute(colors, 3));
-
-          // Swap PBR for a flat unlit material so our per-face colors
-          // aren't re-lit by IBL (which would just average them back
-          // toward white). Side: DoubleSide because RoomPlan walls
-          // face inward.
-          mesh.material = new THREE.MeshBasicMaterial({
-            vertexColors: true,
-            side: THREE.DoubleSide,
-          });
-
-          // Bold edge overlay via Line2 (renders thick screen-space
-          // lines, unlike LineBasicMaterial which is gl.LINES = 1px).
-          const edgesGeom = new THREE.EdgesGeometry(geom, 22);
-          const lineGeom = new LineSegmentsGeometry().fromEdgesGeometry(
-            edgesGeom,
-          );
-          // LineSegments2 (not Line2) is the right pair for
-          // LineSegmentsGeometry — Line2 expects LineGeometry, which is
-          // a continuous polyline, not the disjoint segment pairs that
-          // EdgesGeometry produces.
-          const line = new LineSegments2(lineGeom, lineMat);
-          line.computeLineDistances();
-          line.userData._edgeOverlay = true;
-          // renderOrder pushes the lines to draw after the surface so
-          // they sit cleanly on top.
-          line.renderOrder = 999;
-          mesh.add(line);
-
-          mesh.userData._archified = true;
-        });
-
-        // Keep Line2 looking right when the canvas resizes.
-        const ro =
-          typeof ResizeObserver !== "undefined"
-            ? new ResizeObserver(() => {
-                if (!canvas) return;
-                lineMat.resolution.set(canvas.width, canvas.height);
-              })
-            : null;
-        if (canvas && ro) ro.observe(canvas);
       } catch (e) {
-        console.warn("[scene] post-load surgery failed", e);
+        console.warn("[scene] material tweak failed", e);
       }
     };
     el.addEventListener("load", onLoad);
@@ -354,9 +298,9 @@ function GlbCard({
           // single flat shade and you can't see geometry edges.
           "environment-image": "neutral",
           "tone-mapping": "aces",
-          exposure: "1.0",
-          "shadow-intensity": "1",
-          "shadow-softness": isRoom ? "0.5" : "0.6",
+          exposure: isRoom ? ROOM_EXPOSURE : OBJECT_EXPOSURE,
+          "shadow-intensity": isRoom ? ROOM_SHADOW_INTENSITY : OBJECT_SHADOW_INTENSITY,
+          "shadow-softness": isRoom ? ROOM_SHADOW_SOFTNESS : OBJECT_SHADOW_SOFTNESS,
           // Lift the camera slightly for room scans so we look down
           // into the floor plan.
           ...(isRoom ? { "camera-orbit": "25deg 65deg auto" } : {}),

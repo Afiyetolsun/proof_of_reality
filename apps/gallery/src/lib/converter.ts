@@ -78,7 +78,23 @@ export async function maybeConvertScene(record: EnsRecord): Promise<EnsRecord> {
       console.warn(`[converter] ${convertUrl} → ${res.status}`);
       return record;
     }
-    const json = (await res.json()) as { glbRef?: string };
+    // Read as text first, then JSON.parse manually. Using `res.json()`
+    // throws a SyntaxError when the body is unexpectedly non-JSON
+    // (502 HTML page from a proxy, partial response from a stalled
+    // first-time conversion, etc) and Next.js's dev-tools surface that
+    // SyntaxError as a "Console SyntaxError" overlay even though the
+    // outer try/catch handles it functionally. Manual parse keeps the
+    // error inside our own try block where we can swallow it cleanly.
+    const text = await res.text();
+    let json: { glbRef?: string };
+    try {
+      json = JSON.parse(text) as { glbRef?: string };
+    } catch {
+      console.warn(
+        `[converter] ${convertUrl} returned non-JSON: ${text.slice(0, 80)}…`,
+      );
+      return record;
+    }
     if (!json.glbRef) {
       console.warn(`[converter] ${convertUrl} returned no glbRef`);
       return record;

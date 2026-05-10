@@ -20,13 +20,21 @@
  *
  * Anyone with the URL can verify end-to-end — no app, no wallet.
  */
+import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { resolveEnsName, contentUrl, directContentUrl, normalizeName } from "@/lib/ens.js";
+import {
+  resolveEnsName,
+  contentUrl,
+  directContentUrl,
+  normalizeName,
+  type EnsRecord,
+} from "@/lib/ens.js";
 import { maybeConvertScene } from "@/lib/converter.js";
 import { getProof, ChainConfigMissingError } from "@/lib/chain/index.js";
 import { runVerification } from "@/lib/verify/index.js";
 import { ProofScene } from "./ProofScene";
+import { SceneSkeleton } from "./SceneSkeleton";
 import { Badges } from "./Badges";
 import { ShareButton } from "./ShareButton";
 import { fmtDate } from "./fmt";
@@ -45,11 +53,11 @@ export default async function NamePage({ params }: PageProps) {
     return <ErrorView kind={res.error.code} message={res.error.message} name={name} />;
   }
 
-  // If the contenthash is a USDZ on Swarm, ask the converter for the
-  // GLB version (cached per ref on the VPS) so <model-viewer> can
-  // render it in-canvas. Silent no-op when the converter is offline,
-  // the scene is already GLB, or the format can't be detected.
-  const record = await maybeConvertScene(res.record);
+  // The scene is rendered inside a <Suspense> boundary that awaits the
+  // converter separately — that lets the rest of the page (verification
+  // checks, proof bundle, footer) paint immediately while the
+  // first-time USDZ→GLB conversion (~5–15 s on cache miss) streams in.
+  const record = res.record;
 
   let onchain: Awaited<ReturnType<typeof getProof>> | null = null;
   let checks: Awaited<ReturnType<typeof runVerification>> = [];
@@ -68,7 +76,6 @@ export default async function NamePage({ params }: PageProps) {
   }
   void onchain;
 
-  const sceneUrl = record.content ? contentUrl(record.content) : null;
   const ensAppBase =
     process.env.NEXT_PUBLIC_ENS_APP_BASE_URL ?? "https://sepolia.app.ens.domains";
 
@@ -97,12 +104,14 @@ export default async function NamePage({ params }: PageProps) {
         <ShareButton name={record.name} />
       </header>
 
-      {sceneUrl && (
-        <ProofScene
-          url={sceneUrl}
-          attestor={record.attestor ?? undefined}
-          mode={record.mode ?? undefined}
-        />
+      {record.content && (
+        <Suspense fallback={<SceneSkeleton />}>
+          <StreamedScene
+            record={record}
+            attestor={record.attestor ?? undefined}
+            mode={record.mode ?? undefined}
+          />
+        </Suspense>
       )}
 
       <section className="rounded-[20px] border border-[--color-rule] bg-[--color-surface-raised] px-6 py-5">
@@ -225,6 +234,28 @@ export default async function NamePage({ params }: PageProps) {
       </footer>
     </main>
   );
+}
+
+/**
+ * Async server component that runs the USDZ→GLB conversion lookup and
+ * then renders <ProofScene> with the resulting (or original) ref.
+ * Wrapped in <Suspense> by the parent so the rest of the page can
+ * stream in while the first-time conversion (5–15 s) is running. The
+ * skeleton ring shows in this slot until this component resolves.
+ */
+async function StreamedScene({
+  record,
+  attestor,
+  mode,
+}: {
+  record: EnsRecord;
+  attestor?: string;
+  mode?: string;
+}) {
+  const converted = await maybeConvertScene(record);
+  if (!converted.content) return null;
+  const url = contentUrl(converted.content);
+  return <ProofScene url={url} attestor={attestor} mode={mode} />;
 }
 
 function KV({ label, children }: { label: string; children: React.ReactNode }) {

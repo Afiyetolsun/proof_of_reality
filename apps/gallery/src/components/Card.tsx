@@ -32,12 +32,12 @@ export function Card({ record }: { record: SubnameRecord }) {
             tone from the brand icon to mark "this scan is on-chain". */}
         <div className="pointer-events-none absolute right-3 top-3 z-30 flex flex-col items-end gap-2">
           {record.mode && (
-            <span className="rounded-full border border-[--color-rule] bg-[--color-surface-deep]/85 px-2 py-1 text-mono-xs uppercase tracking-[0.14em] text-[--color-ink-mute] backdrop-blur">
-              {record.mode}
+            <span className="rounded-full border border-[--color-rule] bg-[--color-surface-deep]/85 px-2.5 py-1 text-mono-xs tracking-tight text-[--color-ink-mute] backdrop-blur">
+              {prettyMode(record.mode)}
             </span>
           )}
           {record.tokenId !== null && (
-            <span className="rounded-full border border-[--color-signal-soft] bg-[--color-surface-deep]/85 px-2 py-1 text-mono-xs text-[--color-signal] backdrop-blur">
+            <span className="rounded-full border border-[--color-signal-soft] bg-[--color-surface-deep]/85 px-2.5 py-1 text-mono-xs text-[--color-signal] backdrop-blur">
               #{record.tokenId.toString()}
             </span>
           )}
@@ -115,6 +115,24 @@ export function Card({ record }: { record: SubnameRecord }) {
       </div>
     </article>
   );
+}
+
+/**
+ * Map raw capture-mode strings to readable labels for the corner pill.
+ * Defaults to the input value if we don't recognize it (so future modes
+ * still render something sensible without code changes).
+ */
+function prettyMode(mode: string): string {
+  switch (mode) {
+    case "objectCapture":
+      return "Object";
+    case "roomPlan":
+      return "Room";
+    case "stereoFusion":
+      return "Stereo";
+    default:
+      return mode;
+  }
 }
 
 function formatCapture(ts: number | null): string {

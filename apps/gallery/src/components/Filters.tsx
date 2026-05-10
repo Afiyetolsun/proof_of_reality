@@ -1,14 +1,25 @@
 import Link from "next/link";
 
 export type Sort = "newest" | "oldest";
-/**
- * Mode values match `CAPTURE_MODES` in packages/proof-bundle/src/schema.ts.
- * stereoFusion exists in the schema but no scans use it yet, so we don't
- * surface it in the filter UI — when (if) it ships, add a "stereo" pill.
- */
-export type ModeFilter = "all" | "roomPlan" | "objectCapture";
 
-const MODE_VALUES = ["roomPlan", "objectCapture"] as const;
+/**
+ * Mode values:
+ *   featured       — curated default. Filters out auto-generated
+ *                    `vin-…` test labels by counting digits across the
+ *                    entire ENS name; >4 digits in the FQDN means it's
+ *                    almost certainly a vin- (12-hex VIN) or a noisy
+ *                    timestamped test, not a human-readable scan.
+ *   all            — every scan in the index.
+ *   roomPlan       — RoomPlan captures only.
+ *   objectCapture  — Object Capture only.
+ *
+ * stereoFusion exists in packages/proof-bundle/src/schema.ts but no
+ * scans use it yet, so it isn't surfaced as a pill — add one when (if)
+ * it ships.
+ */
+export type ModeFilter = "featured" | "all" | "roomPlan" | "objectCapture";
+
+const MODE_VALUES = ["featured", "all", "roomPlan", "objectCapture"] as const;
 
 export interface FilterState {
   sort: Sort;
@@ -24,15 +35,53 @@ export function parseFilters(sp: Record<string, string | string[] | undefined>):
   const modeRaw = get("mode");
   const mode: ModeFilter = (MODE_VALUES as readonly string[]).includes(modeRaw ?? "")
     ? (modeRaw as ModeFilter)
-    : "all";
+    : "featured";
   return { sort, mode };
+}
+
+/**
+ * Heuristic for the "featured" pill.
+ *
+ * Includes a scan when EITHER:
+ *
+ *   1. The ENS name has ≤ 4 digits across the whole FQDN. This filters
+ *      out the auto-generated 12-hex `vin-…` labels (always ≥9
+ *      digits) without iOS needing to opt in.
+ *      e.g. `pizza.realityproof.eth` (0), `my-flat-2026.realityproof.eth` (4) ✓
+ *      e.g. `vin-0712b563e5b1.realityproof.eth` (9) ✗
+ *
+ *   2. The scan was created on or after **today's UTC midnight**. New
+ *      mints surface on the index immediately even if they used the
+ *      vin- placeholder — so people testing the iOS app right now see
+ *      their own scans without having to switch the filter to "all".
+ *      Roll-over is automatic: once the date crosses, yesterday's vin
+ *      scans drop back behind the digit-count gate.
+ *
+ * Tweak the digit threshold or the cutoff in this function — it's the
+ * single source of truth for the featured pill.
+ */
+function todayStartUtc(): number {
+  const d = new Date();
+  return Math.floor(
+    Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) / 1000,
+  );
+}
+
+export function isFeatured(record: {
+  name: string;
+  createdAt: number;
+}): boolean {
+  if (record.createdAt >= todayStartUtc()) return true;
+  const digitCount = (record.name.match(/\d/g) ?? []).length;
+  return digitCount <= 4;
 }
 
 function buildHref(state: FilterState, override: Partial<FilterState>): string {
   const next = { ...state, ...override };
   const params = new URLSearchParams();
   if (next.sort !== "newest") params.set("sort", next.sort);
-  if (next.mode !== "all") params.set("mode", next.mode);
+  // featured is the default — don't add to URL
+  if (next.mode !== "featured") params.set("mode", next.mode);
   const qs = params.toString();
   return qs ? `/?${qs}` : "/";
 }
@@ -45,13 +94,26 @@ export function Filters({ state, total }: { state: FilterState; total: number })
       </span>
 
       <FilterGroup label="mode">
+        <Pill
+          href={buildHref(state, { mode: "featured" })}
+          active={state.mode === "featured"}
+          title="Curated picks — hides auto-generated VIN labels"
+        >
+          featured
+        </Pill>
         <Pill href={buildHref(state, { mode: "all" })} active={state.mode === "all"}>
           all
         </Pill>
-        <Pill href={buildHref(state, { mode: "objectCapture" })} active={state.mode === "objectCapture"}>
+        <Pill
+          href={buildHref(state, { mode: "objectCapture" })}
+          active={state.mode === "objectCapture"}
+        >
           object
         </Pill>
-        <Pill href={buildHref(state, { mode: "roomPlan" })} active={state.mode === "roomPlan"}>
+        <Pill
+          href={buildHref(state, { mode: "roomPlan" })}
+          active={state.mode === "roomPlan"}
+        >
           room
         </Pill>
       </FilterGroup>
@@ -83,15 +145,18 @@ function Pill({
   href,
   active,
   children,
+  title,
 }: {
   href: string;
   active: boolean;
   children: React.ReactNode;
+  title?: string;
 }) {
   return (
     <Link
       href={href}
       scroll={false}
+      title={title}
       className={`rounded-full px-3 py-1 text-mono-xs transition-colors ${
         active
           ? "bg-[--color-accent-soft] text-[--color-accent]"

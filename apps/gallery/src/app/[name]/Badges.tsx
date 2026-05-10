@@ -44,7 +44,7 @@ export function Badges({ checks }: Props) {
         return (
           <li
             key={c.name}
-            className={`flex items-start gap-3.5 border ${t.border} ${t.bg} px-3.5 py-3`}
+            className={`flex items-start gap-3.5 rounded-2xl border ${t.border} ${t.bg} px-4 py-3`}
           >
             <span
               aria-hidden
