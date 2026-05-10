@@ -101,7 +101,7 @@ const jsonLd = {
       },
       sameAs: [
         "https://x.com/ProofReality",
-        "https://t.me/ProofReality",
+        "https://t.me/realityproof_app",
         "https://github.com/Afiyetolsun/proof_of_reality",
       ],
       contactPoint: {

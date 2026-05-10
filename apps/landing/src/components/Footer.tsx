@@ -54,7 +54,7 @@ export function Footer() {
 
         <FooterCol title="Community" links={[
           ["X / Twitter", "https://x.com/ProofReality", true],
-          ["Telegram", "https://t.me/ProofReality", true],
+          ["Telegram", "https://t.me/realityproof_app", true],
         ]} />
       </div>
 

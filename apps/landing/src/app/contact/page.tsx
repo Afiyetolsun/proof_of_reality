@@ -26,7 +26,7 @@ export default function ContactPage() {
 
             <dl className="mt-12 divide-y divide-[--color-rule]">
               <ContactMeta label="EMAIL" href="mailto:support@realityproof.app" display="support@realityproof.app" />
-              <ContactMeta label="TELEGRAM" href="https://t.me/ProofReality" display="t.me/ProofReality" external />
+              <ContactMeta label="TELEGRAM" href="https://t.me/realityproof_app" display="t.me/realityproof_app" external />
               <ContactMeta label="X / TWITTER" href="https://x.com/ProofReality" display="@ProofReality" external />
             </dl>
           </div>
