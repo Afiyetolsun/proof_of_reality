@@ -50,28 +50,22 @@ export function parseFilters(sp: Record<string, string | string[] | undefined>):
  *      e.g. `pizza.realityproof.eth` (0), `my-flat-2026.realityproof.eth` (4) ✓
  *      e.g. `vin-0712b563e5b1.realityproof.eth` (9) ✗
  *
- *   2. The scan was created on or after **today's UTC midnight**. New
- *      mints surface on the index immediately even if they used the
- *      vin- placeholder — so people testing the iOS app right now see
- *      their own scans without having to switch the filter to "all".
- *      Roll-over is automatic: once the date crosses, yesterday's vin
- *      scans drop back behind the digit-count gate.
- *
- * Tweak the digit threshold or the cutoff in this function — it's the
- * single source of truth for the featured pill.
+ *   2. The scan was created on or after the hard-coded cutoff below
+ *      (the demo day, 2026-05-10 00:00 UTC). New mints from the demo
+ *      surface on the index even if they used the vin- placeholder.
+ *      Bump SHOWCASE_CUTOFF_UNIX to a later day to roll the second
+ *      axis forward.
  */
-function todayStartUtc(): number {
-  const d = new Date();
-  return Math.floor(
-    Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) / 1000,
-  );
-}
+// 2026-05-10 00:00:00 UTC. Kept as a literal Unix seconds value so
+// it's obvious what it means and there's no Date-dependent surprise.
+// Verify: `node -e "console.log(new Date(1778371200 * 1000).toISOString())"`
+const SHOWCASE_CUTOFF_UNIX = 1778371200;
 
 export function isFeatured(record: {
   name: string;
   createdAt: number;
 }): boolean {
-  if (record.createdAt >= todayStartUtc()) return true;
+  if (record.createdAt >= SHOWCASE_CUTOFF_UNIX) return true;
   const digitCount = (record.name.match(/\d/g) ?? []).length;
   return digitCount <= 4;
 }
