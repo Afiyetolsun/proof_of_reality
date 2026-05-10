@@ -64,6 +64,27 @@ const SHOWCASE_CUTOFF_UNIX = Math.floor(
   Date.parse(SHOWCASE_CUTOFF_DATE) / 1000,
 );
 
+/**
+ * Hard exclusion list. Anything in here is hidden from EVERY view —
+ * featured, all, mode-filtered, sorted. Use for embarrassing test
+ * mints, duplicates, or scans we explicitly don't want surfaced.
+ *
+ * Match is case-insensitive on the FQDN. Add either the bare label
+ * (`vin-0e0c0d5afbcd`) or the full name (`vin-….realityproof.eth`) —
+ * isExcluded normalizes both.
+ */
+const EXCLUDED_NAMES = new Set(
+  [
+    "vin-0e0c0d5afbcd.realityproof.eth",
+    "vin-ffffffffffff.realityproof.eth",
+    "vin-bef3bb2ad60b.realityproof.eth",
+  ].map((n) => n.toLowerCase()),
+);
+
+export function isExcluded(name: string): boolean {
+  return EXCLUDED_NAMES.has(name.toLowerCase());
+}
+
 export function isFeatured(record: {
   name: string;
   createdAt: number;

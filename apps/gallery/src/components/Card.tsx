@@ -9,9 +9,6 @@ import { CardScene } from "./CardScene";
 export function Card({ record }: { record: SubnameRecord }) {
   const captureLabel = formatCapture(record.capturedAt ?? record.createdAt);
   const viewerHref = viewerForName(record.name);
-  const sceneUrl = record.content
-    ? `/api/scene?proto=${record.content.protocol}&ref=${encodeURIComponent(record.content.ref)}`
-    : null;
 
   return (
     <article className="group relative flex flex-col overflow-hidden rounded-[20px] border border-[--color-rule] bg-[--color-surface-raised] transition-colors hover:border-[--color-accent-soft]">
@@ -25,7 +22,13 @@ export function Card({ record }: { record: SubnameRecord }) {
           <CardThumbnail mode={record.mode ?? null} label={record.labelName} />
         </Link>
 
-        {sceneUrl && <CardScene url={sceneUrl} detailHref={viewerHref} />}
+        {record.content && (
+          <CardScene
+            content={record.content}
+            mode={record.mode ?? null}
+            detailHref={viewerHref}
+          />
+        )}
 
         {/* Top-right pills: mode + token. The token pill keeps the
             signal-orange accent — it's the one place we use the warm

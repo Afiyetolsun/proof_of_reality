@@ -21,6 +21,7 @@ import {
   Filters,
   parseFilters,
   isFeatured,
+  isExcluded,
   type FilterState,
 } from "@/components/Filters";
 import { ensAppParentUrl, ensParentName } from "@/lib/viewer-link";
@@ -153,7 +154,9 @@ function GalleryFallback({ filters }: { filters: FilterState }) {
 }
 
 function applyFilters(records: SubnameRecord[], f: FilterState): SubnameRecord[] {
-  let out = records;
+  // Hard exclude list runs FIRST so blacklisted scans never appear in
+  // any view, regardless of filter mode.
+  let out = records.filter((r) => !isExcluded(r.name));
   if (f.mode === "featured") {
     out = out.filter((r) => isFeatured(r));
   } else if (f.mode !== "all") {
