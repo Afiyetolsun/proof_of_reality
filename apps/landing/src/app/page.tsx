@@ -1,6 +1,6 @@
 import { Header } from "../components/Header";
 import { NonceTicker } from "../components/NonceTicker";
-import { SplatHero } from "../components/SplatHero";
+import { ProofHero } from "../components/ProofHero";
 import { Section } from "../components/Section";
 import { CTAButton } from "../components/CTAButton";
 import { RealVsFake } from "../components/RealVsFake";
@@ -60,7 +60,7 @@ function Hero() {
 
       <div className="relative md:col-span-6">
         <div className="ml-auto w-full max-w-[42rem]">
-          <SplatHero />
+          <ProofHero name={process.env.NEXT_PUBLIC_HERO_ENS_NAME ?? "pizza.realityproof.eth"} />
         </div>
       </div>
     </section>
