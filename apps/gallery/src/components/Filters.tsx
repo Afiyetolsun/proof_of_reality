@@ -78,6 +78,8 @@ const EXCLUDED_NAMES = new Set(
     "vin-0e0c0d5afbcd.realityproof.eth",
     "vin-ffffffffffff.realityproof.eth",
     "vin-bef3bb2ad60b.realityproof.eth",
+    "vin-6f447c3c3a5a.realityproof.eth",
+    "vin-dd21feef1457.realityproof.eth",
   ].map((n) => n.toLowerCase()),
 );
 
