@@ -165,14 +165,17 @@ export async function listProofsFromResolver(): Promise<SubnameRecord[]> {
   }
 
   // Best-effort label recovery for user-supplied subnames. If the
-  // subgraph is down we fall back to a node-fingerprint stub so the
-  // card still renders.
+  // subgraph hasn't indexed the subname yet (typical for scans <5 min
+  // old) we leave the row's name/labelName empty and DROP it below —
+  // showing a "node-<8hex>" stub isn't safe because that stub isn't a
+  // real ENS name and clicking it 404s. The row reappears
+  // automatically once the subgraph catches up on the next render.
   if (unknownNodes.length > 0) {
     let labelMap = new Map<Hex, { name: string; labelName: string }>();
     try {
       labelMap = await lookupLabelsByNode(unknownNodes);
     } catch {
-      // swallow — handled below
+      // swallow — unresolved rows are filtered out at the bottom
     }
     for (const node of unknownNodes) {
       const r = stagedByNode.get(node);
@@ -181,15 +184,13 @@ export async function listProofsFromResolver(): Promise<SubnameRecord[]> {
       if (found) {
         r.name = found.name;
         r.labelName = found.labelName;
-      } else {
-        const stub = `node-${node.slice(2, 10)}`;
-        r.labelName = stub;
-        r.name = `${stub}.${PARENT_NAME}`;
       }
     }
   }
 
-  return records;
+  // Keep only rows whose label we successfully resolved (either
+  // derived from bundleHash, or recovered from the subgraph).
+  return records.filter((r) => r.name !== "" && r.labelName !== "");
 }
 
 /**
