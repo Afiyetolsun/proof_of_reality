@@ -217,9 +217,18 @@ function Demo() {
 
   return (
     <Section id="demo" eyebrow="VERIFY ONE" index="04" display="Open a real proof.">
-      <div className="grid grid-cols-1 gap-12 md:grid-cols-12 md:gap-x-6">
-        <div className="md:col-span-7">
-          <ol className="space-y-5">
+      <div className="grid grid-cols-1 items-start gap-12 md:grid-cols-12 md:gap-x-10">
+        <div className="md:col-span-5">
+          <DemoVideo />
+        </div>
+
+        <div className="md:col-span-7 md:pl-2">
+          <p className="max-read text-body text-[--color-ink-mute]">
+            The app re-fetches the bundle from Swarm, recomputes the hash, and checks all five
+            witnesses against their public keys. It either accepts or it doesn&rsquo;t.
+          </p>
+
+          <ol className="mt-10 space-y-5">
             {steps.map(([title, detail], i) => (
               <li
                 key={title}
@@ -236,14 +245,8 @@ function Demo() {
               </li>
             ))}
           </ol>
-        </div>
 
-        <aside className="md:col-span-5">
-          <p className="max-read text-body text-[--color-ink-mute]">
-            The app re-fetches the bundle from Swarm, recomputes the hash, and checks all five
-            witnesses against their public keys. It either accepts or it doesn&rsquo;t.
-          </p>
-          <div className="mt-8 flex flex-wrap items-center gap-x-8 gap-y-4">
+          <div className="mt-10 flex flex-wrap items-center gap-x-8 gap-y-4">
             <CTAButton href={viewerHome} size="lg" external>
               Open the app
             </CTAButton>
@@ -251,9 +254,32 @@ function Demo() {
               Browse on ENS
             </CTAButton>
           </div>
-        </aside>
+        </div>
       </div>
     </Section>
+  );
+}
+
+function DemoVideo() {
+  return (
+    <figure className="relative mx-auto w-full max-w-[22rem] overflow-hidden border border-[--color-rule] bg-[--color-surface-raised]">
+      <div className="aspect-[9/16] w-full">
+        <video
+          className="h-full w-full object-cover"
+          src="/promo.webm"
+          autoPlay
+          muted
+          loop
+          controls
+          playsInline
+          preload="metadata"
+          poster="/og-image.png"
+        />
+      </div>
+      <figcaption className="pointer-events-none absolute left-3 top-3 text-mono-s text-[--color-ink-mute]">
+        PROMO · 90 SEC
+      </figcaption>
+    </figure>
   );
 }
 
